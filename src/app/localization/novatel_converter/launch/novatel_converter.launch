@@ -1,0 +1,8 @@
+<!-- -->
+<launch>
+
+  <rosparam file="$(find novatel_converter)/../../../../config/system.yaml" command="load"/>  
+  <node pkg="novatel_converter" type="novatel_converter" name="novatel_converter" output="screen">
+
+  </node>
+</launch>

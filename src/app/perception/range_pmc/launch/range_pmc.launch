@@ -1,0 +1,8 @@
+<!-- -->
+<launch>
+
+  <rosparam file="$(find range_pmc)/../../../../config/system.yaml" command="load"/>  
+  <node pkg="range_pmc" type="range_pmc" name="range_pmc" output="screen" respawn="true">
+
+  </node>
+</launch>

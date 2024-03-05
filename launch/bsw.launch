@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<launch>
+
+  <include file="$(find tf_static)/launch/tf_static.launch">
+  </include>
+
+  <include file="$(find tf_dynamic)/launch/tf_dynamic.launch">
+  </include>
+  
+  <include file="$(find novatel_converter)/launch/novatel_converter.launch">
+  </include>
+
+</launch>

@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<launch>
+    <!-- rviz turn on/off flag -->
+    <arg name = "rviz_flag"                         default = "false"/>
+    <arg name = "lidar_type"                        default = "rslidar"/>
+    <!-- Topic names -->
+    <!-- <arg name = "input_topic_name"                  default = "/CarMaker/Sensor/Lidar_64ch_1"/>    -->
+    <!-- <arg name = "input_topic_name"                  default = "/scala_gen2_points"/> -->
+    <arg name = "input_topic_name"                  default = "velodyne_points"/>
+    <!-- <arg name = "input_topic_name"                  default = "ouster/points"/> -->
+    <!-- <arg name = "input_topic_name"                  default = "/center/rslidar_points"/> -->
+    <arg name = "output_topic_name"                 default = "/processing/output_points"/>
+    <arg name = "output_topic_name_ground"          default = "/processing/ground_points"/>
+    <arg name = "output_topic_name_non_ground"      default = "/processing/non_ground_points"/>
+    <arg name = "output_topic_frame"                default = "velodyne"/>
+    <!-- Range Image configuration -->
+    <arg name = "image_flip_x"                      default = "false"/>
+    <arg name = "image_flip_y"                      default = "false"/>
+    <arg name = "range_img_max_value"               default = "20"/>
+    <arg name = "range_img_min_value"               default = "0.1"/>
+
+
+    <!-- ini path -->
+    <arg name = "range_image_ini_config_file_path"              default = "/home/jaeyoung/git/pole-based-localization/src/app/lidar_preprocessing/config/range_image.ini"/>
+    <arg name = "segmentation_ini_config_file_path"             default = "/home/jaeyoung/git/pole-based-localization/src/app/lidar_preprocessing/config/line_based_segmentation.ini"/>
+
+    <node pkg="lidar_preprocessing" type="lidar_preprocessing" name="lidar_preprocessing" output="screen">
+        <param name="ros_config_lidar_type"                                               value = "$(arg lidar_type)" />\
+        <param name="ros_config_input_topic_name"                                         value = "$(arg input_topic_name)" />
+        <param name="ros_config_output_topic"                                             value = "$(arg output_topic_name)" />
+        <param name="ros_config_output_topic_ground"                                      value = "$(arg output_topic_name_ground)" />
+        <param name="ros_config_output_topic_non_ground"                                  value = "$(arg output_topic_name_non_ground)" />
+        <param name="ros_config_output_topic_frame"                                       value = "$(arg output_topic_frame)" />
+        <param name="ros_config_range_image_ini_file_path"                                value = "$(arg range_image_ini_config_file_path)" />
+        <param name="ros_config_segmentation_ini_file_path"                               value = "$(arg segmentation_ini_config_file_path)" />
+        <param name="ros_image_flip_x"                                                    value = "$(arg image_flip_x)" />
+        <param name="ros_image_flip_y"                                                    value = "$(arg image_flip_y)" />
+        <param name="ros_range_img_min_value"                                             value = "$(arg range_img_min_value)" />
+        <param name="ros_range_img_max_value"                                             value = "$(arg range_img_max_value)" />
+    </node>
+
+    <!-- Rviz configuration -->
+    <group if="$(arg rviz_flag)">
+        <node pkg="rviz" type="rviz" name="rviz_lidar_processing" args="-d $(find lidar_preprocessing)/config/lidar_preprocessing_tool.rviz" />
+    </group>
+
+</launch>
