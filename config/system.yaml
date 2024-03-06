@@ -24,14 +24,18 @@ range_pmc:
   min_occluded_num: 5
   neighbor_pixel_max: 2
   min_key_frame_time: 0.2
-  min_key_frame_rot: 2.0
+  min_key_frame_rot: 3.0
   fov_up: 15 # 22.5     15
   fov_down: -25 # -22.5  -25
   fov_left: 180.0
   fov_right: -180.0
   height_filter: false
 
-  ground_angle: 10 # deg
+  ground_angle: 5 # deg
+
+  dist_threshold_m: 1.0
+
+  debug_image: true
   
 
 # Task ID

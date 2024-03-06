@@ -45,10 +45,10 @@
 using namespace std;
 
 // 
-#define MAX_2D_N       (324000)     // MAX_1D * MAX_1D_HALF
-#define MAX_1D         (900)       // maximum horizontal point of Range Image.     2pi / horizontal_resolution
+#define MAX_2D_N       (648000)     // MAX_1D * MAX_1D_HALF
+#define MAX_1D         (1800)       // maximum horizontal point of Range Image.     2pi / horizontal_resolution
 #define MAX_1D_HALF    (360)        // maximum vertical channel num of Range Image. pi / vertical_resolution
-#define MAX_POINT      (524288)
+#define MAX_POINT      (648000)
 
 struct range_pmc_params{
     float f_horizontal_resolution;
@@ -68,9 +68,28 @@ struct range_pmc_params{
 
     float f_ground_angle;
 
+    float f_dist_threshold_m;
+    int i_segment_min_point_num;
+    int i_segment_valid_point_num;
+    int i_segment_valid_line_num;
+
+    bool b_debug_image;
+
     std::vector<float> vec_f_ego_to_lidar;
 };
 
+
+struct by_size_decent
+{
+    bool operator()(std::vector<int> const &left, std::vector<int> const &right)
+    {
+        return left.size() > right.size();
+    }
+};
+
+
+typedef std::pair<int, int> PixelCoord;
+typedef std::vector<PixelCoord> Pixels;
 
 enum dyn_obj_flg {STATIC, CASE1, CASE2, CASE3, SELF, UNCERTAIN, INVALID};
 
@@ -106,7 +125,7 @@ struct point_soph
         position   = hor_ind * MAX_1D_HALF + ver_ind;
         cluster_ind = -1;
         ground      = false;
-        incident   = -1;
+        incident   = -1.0;
         time       = -1;
         transl.setZero();
         glob.setZero();
@@ -119,7 +138,7 @@ struct point_soph
         hor_ind  = ver_ind = position = 0;
         cluster_ind = -1;
         ground      = false;
-        incident   = -1;
+        incident   = -1.0;
         time       = -1;
         transl.setZero();
         glob.setZero();
@@ -133,7 +152,7 @@ struct point_soph
         ver_ind = ind2;
         cluster_ind = -1;
         ground     = false;
-        incident   = -1;
+        incident   = -1.0;
         position = pos;
         time = -1;
         transl.setZero();
@@ -169,9 +188,6 @@ struct point_soph
         hor_ind   = floor((vec(0) + M_PI) / hor_resolution_max);
         ver_ind   = floor((vec(1) + 0.5 * M_PI) / ver_resolution_max);
         position  = hor_ind * MAX_1D_HALF + ver_ind;
-        ground    = false;
-        incident  = -1;
-        cluster_ind = -1;
     };
 
     void reset()
@@ -184,7 +200,7 @@ struct point_soph
 // Range image class
 
 typedef std::vector<std::vector<point_soph*>>  RangeImage2D; // image --> pixel --> points in pixel
-
+//           position     points_in_pixel   pixel_pointer
 class RangeImage
 {
 public:
@@ -200,6 +216,7 @@ public:
     float*           max_range_static = nullptr;
     int*             max_range_index_all = nullptr;
     int*             min_range_index_all = nullptr;
+    std::vector<std::vector<int>> cluster_poses_vec;
 
     std::vector<int> index_vector; // Index of point in rangeimage
 
@@ -230,9 +247,11 @@ public:
 
         map_index = -1;
         index_vector.assign(MAX_2D_N, 0);
-        for (int i = 0; i < MAX_2D_N; i++) { // Reset point index from 0 to MAX_2D_N-1
+        for (int i = 0; i < MAX_2D_N; i++) { 
             index_vector[i] = i;
         }
+
+        cluster_poses_vec.clear();
         
     }
 
@@ -259,6 +278,8 @@ public:
         for (int i = 0; i < MAX_2D_N; i++) {
             index_vector[i] = i;
         }
+
+        cluster_poses_vec.clear();
     }
 
     RangeImage(const RangeImage & cur)
@@ -292,6 +313,8 @@ public:
         for (int i = 0; i < MAX_2D_N; i++) {
             index_vector[i] = i;
         }
+
+        cluster_poses_vec.clear();
     }
 
     ~RangeImage()
@@ -325,6 +348,8 @@ public:
         fill_n(max_range_static, MAX_2D_N, 0.0);
         fill_n(max_range_index_all, MAX_2D_N, -1);
         fill_n(min_range_index_all, MAX_2D_N, -1);
+
+        cluster_poses_vec.clear();
     }
 
 };
@@ -350,6 +375,7 @@ class RangePmc{
     // 시간, rot, transl를 고려하여 range image 생성
     void GenerateRangeImage(std::vector<point_soph*> &points, double cur_time, M3D rot, V3D transl); 
     void GenerateRangeImage(point_soph* &points, double cur_time, M3D rot, V3D transl, int len, RangeImage::Ptr range_image_pointer); 
+    void GenerateRangeImage(std::vector<point_soph*> &points, double cur_time, M3D rot, V3D transl, RangeImage::Ptr range_image_pointer); 
 
     void GroundSegmentation(RangeImage::Ptr range_image_ptr);
     void ObjectSegmentation(RangeImage::Ptr range_image_ptr);
@@ -361,11 +387,20 @@ class RangePmc{
     bool CheckVerFoV(const point_soph & p, const RangeImage &image_info);
     bool CheckNeighbor(const point_soph & p, const RangeImage &image_info, float &max_range, float &min_range);
 
+    //
+    void NeighborAssign(unsigned int neighbor_size);
+    void LabelComponents(RangeImage::Ptr range_image_ptr, uint16_t row, uint16_t col);
+    void ResetClustering();
+
     // Output
-    void OutputPmcPC(std::vector<point_soph*> &points);
+    void OutputPmcPC(const std::vector<point_soph*> &points);
     void OutputRangeImagesPc();
     cv::Mat GetRangeImageCv();
     cv::Mat GetDynamicImageCv();
+    cv::Mat GetIncidentImageCv();
+    cv::Mat GetClusterImageCv();
+    cv::Mat GetGroundImageCv();
+
 
     public:
     std::deque<RangeImage::Ptr> range_image_list; // back이 최신, front가 old
@@ -383,11 +418,26 @@ class RangePmc{
 
     double time_search = 0.0, time_search_0 = 0.0, time_research = 0.0, time_build = 0.0, time_other0 = 0.0, time_total = 0.0, time_total_avr = 0.0;
     int    pixel_fov_up, pixel_fov_down, pixel_fov_left, pixel_fov_right;
+    int    m_i_row_size, m_i_col_size;
     int    occu_time_th = 3, is_occu_time_th = 3, map_index = 0;
 
     int max_pixel_points = 50; // 픽셀당 최대 포인트 수 
 
     bool is_key_frame;
+
+    int i_small_incident = 0;
+    int i_total_incident = 0;
+
+    private:
+    // Object segmentation
+
+    std::vector<std::pair<int8_t, int8_t> > m_v_neighbor_iter;
+
+    std::vector<uint16_t> m_v_ui16_queue_idx_x; // array for breadth-first search process of segmentation, for speed
+    std::vector<uint16_t> m_v_ui16_queue_idx_y;
+
+    int i_cluster_idx = 0;
+
 
     // configure;
     private:

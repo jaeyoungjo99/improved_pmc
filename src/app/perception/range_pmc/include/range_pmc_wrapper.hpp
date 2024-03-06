@@ -112,35 +112,25 @@ class RangePmcWrapper{
 
         // PMC
         RangePmcPtr->Filter(i_xyzin_point_cloud_ptr_, lidar_synced_pose_.rotation().cast<double>(), lidar_synced_pose_.translation().cast<double>(), cur_time);
-        // RangePmcPtr->Filter(i_xyzin_point_cloud_ptr_, cur_rot, cur_pos, cur_time);
         RangePmcPtr->GetFilteredPoint(o_pmc_xyzrgb_pcptr_);
 
+        if(cfg_b_debug_image_ == false) return;
 
         std_msgs::Header img_header_range;
-        cv_bridge::CvImage img_bridge_range;
-
+        cv_bridge::CvImage img_bridge_range, img_bridge_incident;
+        
+        // RGB Range Image
         cv::Mat mat_range_img = RangePmcPtr->GetRangeImageCv();
-        // cv::Mat mat_vis_range_img;
-        // float f_scale_factor_32F_to_8u_range = (float)std::numeric_limits<uint8_t>::max()/( 80 - 0.5 ); // normalize - max: 80, min: 0.5 [m]
-        // mat_range_img.convertTo(mat_vis_range_img, CV_8U, f_scale_factor_32F_to_8u_range );
-
         float min_distance = 0.5f; // 최소 거리 (미터)
         float max_distance = 50.0f; // 최대 거리 (미터)
 
         cv::Mat mat_vis_range_img(mat_range_img.rows, mat_range_img.cols, CV_8UC3);
         for (int y = 0; y < mat_range_img.rows; y++) {
             for (int x = 0; x < mat_range_img.cols; x++) {
-                // 현재 픽셀의 거리값을 가져옵니다.
                 float distance = mat_range_img.at<float>(y, x);
-        
-                // 거리를 0.5 ~ 80.0 범위 내로 제한합니다.
                 double filtered_distance = std::min(std::max(distance, min_distance), max_distance);
-                
-                // 거리에 따른 색상을 계산합니다 (0.5에 가까울수록 파란색, 80에 가까울수록 빨간색).
                 float normalized = (filtered_distance - min_distance) / (max_distance - min_distance);
                 
-                // RGB 채널을 거리에 따라 계산합니다.
-                // 파란색에서 빨간색으로 (중간은 녹색).
                 uchar blue = static_cast<uchar>((1.0f - normalized) * 255.0f);
                 uchar green = static_cast<uchar>((1.0f - std::abs(normalized - 0.5f) * 2) * 255.0f);
                 uchar red = static_cast<uchar>(normalized * 255.0f);
@@ -151,22 +141,60 @@ class RangePmcWrapper{
                     red = 0;
                 }
                 
-                // RGB 이미지에 색상을 설정합니다.
                 mat_vis_range_img.at<cv::Vec3b>(y, x) = cv::Vec3b(blue, green, red);
 
             }
         }
         img_bridge_range = cv_bridge::CvImage(img_header_range, sensor_msgs::image_encodings::RGB8, mat_vis_range_img );
-
-        // img_bridge_range = cv_bridge::CvImage(img_header_range, sensor_msgs::image_encodings::MONO8, mat_vis_range_img );
         img_bridge_range.toImageMsg(o_range_image_msg_);
 
+        // RGB Incident Image
+        cv::Mat mat_incident_img = RangePmcPtr->GetIncidentImageCv();
+        float min_incident = 0.0f; // red
+        float max_incident = 90.0f; // blue
+
+        int count = 0;
+
+        cv::Mat mat_vis_incident_img(mat_incident_img.rows, mat_incident_img.cols, CV_8UC3);
+        for (int y = 0; y < mat_incident_img.rows; y++) {
+            for (int x = 0; x < mat_incident_img.cols; x++) {
+                float incident = mat_incident_img.at<float>(y, x) * 180/M_PI;
+                double filtered_incident = std::min(std::max(incident, min_incident), max_incident);
+                float normalized = (filtered_incident - min_incident) / (max_incident - min_incident);
+                
+                uchar blue = static_cast<uchar>((1.0f - normalized) * 255.0f);
+                uchar green = static_cast<uchar>((1.0f - std::abs(normalized - 0.5f) * 2) * 255.0f);
+                uchar red = static_cast<uchar>(normalized * 255.0f);
+
+                if(incident < -10E-5){
+                    blue = 0;
+                    green = 0;
+                    red = 0;
+                    count++;
+                }
+                
+                mat_vis_incident_img.at<cv::Vec3b>(y, x) = cv::Vec3b(blue, green, red);
+
+            }
+        }
+        std::cout<<"mat_vis_incident_img: "<<count<<std::endl;
+        img_bridge_incident = cv_bridge::CvImage(img_header_range, sensor_msgs::image_encodings::RGB8, mat_vis_incident_img );
+        img_bridge_incident.toImageMsg(o_incident_image_msg_);
+
+        cv::Mat mat_cluster_img = RangePmcPtr->GetClusterImageCv();
+        img_bridge_range = cv_bridge::CvImage(img_header_range, sensor_msgs::image_encodings::RGB8, mat_cluster_img );
+        img_bridge_range.toImageMsg(o_cluster_image_msg_);
 
         cv::Mat mat_dynamic_img = RangePmcPtr->GetDynamicImageCv();
-        cv::Mat mat_vis_dynamic_img;
         img_bridge_range = cv_bridge::CvImage(img_header_range, sensor_msgs::image_encodings::RGB8, mat_dynamic_img );
         img_bridge_range.toImageMsg(o_dynamic_image_msg_);
 
+
+        cv::Mat mat_ground_img = RangePmcPtr->GetGroundImageCv();
+        cv::Mat mat_vis_ground_img;
+        mat_ground_img.convertTo(mat_vis_ground_img, CV_8U, std::numeric_limits<uint8_t>::max());
+        img_bridge_range = cv_bridge::CvImage(img_header_range, sensor_msgs::image_encodings::MONO8, mat_vis_ground_img );
+        img_bridge_range.toImageMsg(o_ground_image_msg_);
 
         UpdatePmcPointCloud(o_pmc_xyzrgb_pcptr_);
         Publish();
@@ -202,7 +230,7 @@ class RangePmcWrapper{
         Eigen::Affine3f iter_lidar_pose = transform.cast<float>();
 
         deque_time_lidar_pose_.push_back(std::make_pair(cur_odom.header.stamp.toSec() ,iter_lidar_pose));
-        std::cout<<"IMU Time pushback: "<<cur_odom.header.stamp.toSec()<<std::endl;
+        // std::cout<<"IMU Time pushback: "<<cur_odom.header.stamp.toSec()<<std::endl;
 
         while(deque_time_lidar_pose_.size() > 200) deque_time_lidar_pose_.pop_front();
 
@@ -229,7 +257,10 @@ class RangePmcWrapper{
 
         Publisher pub_pmc_point_cloud_;
         Publisher pub_range_image_;
+        Publisher pub_incident_image_;
         Publisher pub_dynamic_image_;
+        Publisher pub_ground_image_;
+        Publisher pub_cluster_image_;
         Publisher pub_angle_image_;
 
     // Data
@@ -269,7 +300,10 @@ class RangePmcWrapper{
         pcl::PointCloud<pcl::PointXYZRGB>::Ptr o_pmc_xyzrgb_pcptr_;
         sensor_msgs::PointCloud2 o_pmc_point_cloud_msg_;
         sensor_msgs::Image o_range_image_msg_;
+        sensor_msgs::Image o_incident_image_msg_;
         sensor_msgs::Image o_dynamic_image_msg_;
+        sensor_msgs::Image o_ground_image_msg_;
+        sensor_msgs::Image o_cluster_image_msg_;
         sensor_msgs::Image o_angle_image_msg_;
         
 
@@ -308,6 +342,9 @@ class RangePmcWrapper{
         bool  cfg_b_height_filter_;
 
         float cfg_f_ground_angle_;
+        float cfg_f_dist_threshold_m_;
+
+        bool cfg_b_debug_image_;
 
         std::vector<float> cfg_vec_f_ego_to_lidar_;
 

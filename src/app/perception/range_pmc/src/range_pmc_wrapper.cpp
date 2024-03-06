@@ -32,6 +32,8 @@ void RangePmcWrapper::Init(){
     if (!nh.getParam("/range_pmc/neighbor_pixel_max", cfg_i_neighbor_pixel_max_)) cfg_i_neighbor_pixel_max_ = 3;
     if (!nh.getParam("/range_pmc/height_filter", cfg_b_height_filter_)) cfg_b_height_filter_ = false;
     if (!nh.getParam("/range_pmc/ground_angle", cfg_f_ground_angle_)) cfg_f_ground_angle_ = 0.0;
+    if (!nh.getParam("/range_pmc/dist_threshold_m", cfg_f_dist_threshold_m_)) cfg_f_dist_threshold_m_ = 1.0;
+    if (!nh.getParam("/range_pmc/debug_image", cfg_b_debug_image_)) cfg_b_debug_image_ = 0.0;
 
 
     params.f_horizontal_resolution = cfg_f_horizontal_resolution_ * M_PI/180.0;
@@ -52,6 +54,9 @@ void RangePmcWrapper::Init(){
     params.vec_f_ego_to_lidar = cfg_vec_f_ego_to_lidar_;
     params.i_neighbor_pixel_max = cfg_i_neighbor_pixel_max_;
     params.f_ground_angle = cfg_f_ground_angle_;
+    params.f_dist_threshold_m = cfg_f_dist_threshold_m_;
+
+    params.b_debug_image = cfg_b_debug_image_;
 
 
     sub_point_cloud_        = nh.subscribe(cfg_str_lidar_topic_name_, 1, &RangePmcWrapper::CallbackPointCloud, this);
@@ -59,7 +64,10 @@ void RangePmcWrapper::Init(){
 
     pub_pmc_point_cloud_    = nh.advertise<sensor_msgs::PointCloud2>("app/perc/pmc_point_cloud", 10);
     pub_range_image_        = nh.advertise<sensor_msgs::Image>("app/perc/range_image", 10);
+    pub_incident_image_     = nh.advertise<sensor_msgs::Image>("app/perc/incident_image", 10);
     pub_dynamic_image_      = nh.advertise<sensor_msgs::Image>("app/perc/dynamic_image", 10);
+    pub_ground_image_       = nh.advertise<sensor_msgs::Image>("app/perc/ground_image", 10);
+    pub_cluster_image_      = nh.advertise<sensor_msgs::Image>("app/perc/cluster_image", 10);
     pub_angle_image_        = nh.advertise<sensor_msgs::Image>("app/perc/angle_image", 10);
 
     i_tmp_ouster_cloud_ptr_.reset(new pcl::PointCloud<OusterPointXYZIRT>());
@@ -95,7 +103,10 @@ void RangePmcWrapper::Run(){
 void RangePmcWrapper::Publish(){
     pub_pmc_point_cloud_.publish(o_pmc_point_cloud_msg_);
     pub_range_image_.publish(o_range_image_msg_);
+    pub_incident_image_.publish(o_incident_image_msg_);
     pub_dynamic_image_.publish(o_dynamic_image_msg_);
+    pub_ground_image_.publish(o_ground_image_msg_);
+    pub_cluster_image_.publish(o_cluster_image_msg_);
     pub_angle_image_.publish(o_angle_image_msg_);
 }
 
