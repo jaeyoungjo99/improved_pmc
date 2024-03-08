@@ -101,7 +101,7 @@ class TransformFrameDynamic(object):
         transform = Transform()
         transform.translation.x = self.vehicle_state.pose.pose.position.x
         transform.translation.y = self.vehicle_state.pose.pose.position.y
-        transform.translation.z = 0.0
+        transform.translation.z = self.vehicle_state.pose.pose.position.z
 
         transform.rotation.x = self.vehicle_state.pose.pose.orientation.x
         transform.rotation.y = self.vehicle_state.pose.pose.orientation.y

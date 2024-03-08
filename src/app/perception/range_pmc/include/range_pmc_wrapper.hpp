@@ -45,7 +45,8 @@ class RangePmcWrapper{
         
         std::cout<<std::endl;
         std::cout.precision(20);
-        std::cout<<"PointCloud Callback: "<<main_lidar_time_.toSec()<<std::endl;
+
+        ROS_WARN_STREAM("PointCloud Callback: "<<main_lidar_time_.toSec());
         
         if(cfg_str_lidar_type_ == "velodyne"){
             main_lidar_time_ -= ros::Duration(0.1);
@@ -74,14 +75,13 @@ class RangePmcWrapper{
                 dst.intensity = src.intensity;
                 dst.ring = src.ring;
                 dst.time = src.t * 1e-9f;
+
             }
+
         }
 
-
-        // TODO Deskewing
         if(RunDeskewing(i_xyzirt_point_cloud_ptr_, i_xyzirt_point_cloud_deskwed_ptr_) == false)
             return;
-
 
         i_xyzin_point_cloud_ptr_->points.resize(i_xyzirt_point_cloud_deskwed_ptr_->size());
         i_xyzin_point_cloud_ptr_->is_dense = i_xyzirt_point_cloud_deskwed_ptr_->is_dense;
@@ -113,6 +113,8 @@ class RangePmcWrapper{
         // PMC
         RangePmcPtr->Filter(i_xyzin_point_cloud_ptr_, lidar_synced_pose_.rotation().cast<double>(), lidar_synced_pose_.translation().cast<double>(), cur_time);
         RangePmcPtr->GetFilteredPoint(o_pmc_xyzrgb_pcptr_);
+        RangePmcPtr->GetKeyFramePoint(o_key_frame_xyzrgb_pcptr_);
+        RangePmcPtr->GetClusterPoint(o_cluster_xyzrgb_pcptr_);
 
         if(cfg_b_debug_image_ == false) return;
 
@@ -122,7 +124,7 @@ class RangePmcWrapper{
         // RGB Range Image
         cv::Mat mat_range_img = RangePmcPtr->GetRangeImageCv();
         float min_distance = 0.5f; // 최소 거리 (미터)
-        float max_distance = 50.0f; // 최대 거리 (미터)
+        float max_distance = 40.0f; // 최대 거리 (미터)
 
         cv::Mat mat_vis_range_img(mat_range_img.rows, mat_range_img.cols, CV_8UC3);
         for (int y = 0; y < mat_range_img.rows; y++) {
@@ -192,11 +194,13 @@ class RangePmcWrapper{
 
         cv::Mat mat_ground_img = RangePmcPtr->GetGroundImageCv();
         cv::Mat mat_vis_ground_img;
-        mat_ground_img.convertTo(mat_vis_ground_img, CV_8U, std::numeric_limits<uint8_t>::max());
+        mat_ground_img.convertTo(mat_vis_ground_img, CV_8U, std::numeric_limits<uint8_t>::max() / 2);
         img_bridge_range = cv_bridge::CvImage(img_header_range, sensor_msgs::image_encodings::MONO8, mat_vis_ground_img );
         img_bridge_range.toImageMsg(o_ground_image_msg_);
 
         UpdatePmcPointCloud(o_pmc_xyzrgb_pcptr_);
+        UpdateKeyFramePointCloud(o_key_frame_xyzrgb_pcptr_);
+        UpdateClusterPointCloud(o_cluster_xyzrgb_pcptr_);
         Publish();
     }
     inline void CallbackOdometry(const geometry_msgs::PoseWithCovarianceStamped& cur_odom)
@@ -240,6 +244,8 @@ class RangePmcWrapper{
     }
 
     void UpdatePmcPointCloud(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud);
+    void UpdateKeyFramePointCloud(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud);
+    void UpdateClusterPointCloud(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud);
 
 
     bool RunDeskewing(pcl::PointCloud<PointXYZIRT>::Ptr i_point_cloud,
@@ -256,6 +262,9 @@ class RangePmcWrapper{
         Subscriber sub_odometry_;
 
         Publisher pub_pmc_point_cloud_;
+        Publisher pub_key_frame_point_cloud_;
+        Publisher pub_cluster_point_cloud_;
+
         Publisher pub_range_image_;
         Publisher pub_incident_image_;
         Publisher pub_dynamic_image_;
@@ -291,6 +300,13 @@ class RangePmcWrapper{
         float pitchIncre;
         float yawIncre;
 
+        float odomIncreXs2p;
+        float odomIncreYs2p;
+        float odomIncreZs2p;
+        float rollIncres2p;
+        float pitchIncres2p;
+        float yawIncres2p;
+
         std::deque<std::pair<double, Eigen::Affine3f>>    deque_time_lidar_pose_;
         std::pair<double, Eigen::Affine3f> scan_start_lidar_time_pose_;
         std::pair<double, Eigen::Affine3f> scan_end_lidar_time_pose_;
@@ -298,7 +314,13 @@ class RangePmcWrapper{
 
     // Output
         pcl::PointCloud<pcl::PointXYZRGB>::Ptr o_pmc_xyzrgb_pcptr_;
+        pcl::PointCloud<pcl::PointXYZRGB>::Ptr o_key_frame_xyzrgb_pcptr_;
+        pcl::PointCloud<pcl::PointXYZRGB>::Ptr o_cluster_xyzrgb_pcptr_;
+
         sensor_msgs::PointCloud2 o_pmc_point_cloud_msg_;
+        sensor_msgs::PointCloud2 o_key_frame_point_cloud_msg_;
+        sensor_msgs::PointCloud2 o_cluster_point_cloud_msg_;
+
         sensor_msgs::Image o_range_image_msg_;
         sensor_msgs::Image o_incident_image_msg_;
         sensor_msgs::Image o_dynamic_image_msg_;
@@ -324,6 +346,7 @@ class RangePmcWrapper{
         string cfg_str_odom_topic_name_;
         string cfg_str_lidar_type_;
         
+        bool  cfg_b_deskewing_;
         float cfg_f_horizontal_resolution_;
         float cfg_f_vertical_resolution_;
         float cfg_f_min_range_;
@@ -343,7 +366,14 @@ class RangePmcWrapper{
 
         float cfg_f_ground_angle_;
         float cfg_f_dist_threshold_m_;
+        int   cfg_i_segment_min_point_num_;
+        int   cfg_i_segment_valid_poiint_num_;
+        int   cfg_i_segment_valid_line_num_;
+            
+        bool cfg_b_cluster_level_filtering_;
 
+        bool cfg_b_output_static_point_;
+        bool cfg_b_output_min_range_;
         bool cfg_b_debug_image_;
 
         std::vector<float> cfg_vec_f_ego_to_lidar_;

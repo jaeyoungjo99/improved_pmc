@@ -44,11 +44,17 @@
 
 using namespace std;
 
-// 
-#define MAX_2D_N       (648000)     // MAX_1D * MAX_1D_HALF
-#define MAX_1D         (1800)       // maximum horizontal point of Range Image.     2pi / horizontal_resolution
-#define MAX_1D_HALF    (360)        // maximum vertical channel num of Range Image. pi / vertical_resolution
-#define MAX_POINT      (648000)
+// // VLP32
+// #define MAX_2D_N       (648000)     // MAX_1D * MAX_1D_HALF
+// #define MAX_1D         (1800)       // maximum horizontal point of Range Image.     2pi / horizontal_resolution
+// #define MAX_1D_HALF    (360)        // maximum vertical channel num of Range Image. pi / vertical_resolution
+// #define MAX_POINT      (648000)
+
+// Ouster 128-512
+#define MAX_2D_N       (281600)     // MAX_1D * MAX_1D_HALF
+#define MAX_1D         (512)       // maximum horizontal point of Range Image.     2pi / horizontal_resolution
+#define MAX_1D_HALF    (550)        // maximum vertical channel num of Range Image. pi / vertical_resolution
+#define MAX_POINT      (281600)
 
 struct range_pmc_params{
     float f_horizontal_resolution;
@@ -73,6 +79,10 @@ struct range_pmc_params{
     int i_segment_valid_point_num;
     int i_segment_valid_line_num;
 
+    bool b_cluster_level_filtering;
+
+    bool b_output_static_point;
+    bool b_output_min_range;
     bool b_debug_image;
 
     std::vector<float> vec_f_ego_to_lidar;
@@ -91,7 +101,7 @@ struct by_size_decent
 typedef std::pair<int, int> PixelCoord;
 typedef std::vector<PixelCoord> Pixels;
 
-enum dyn_obj_flg {STATIC, CASE1, CASE2, CASE3, SELF, UNCERTAIN, INVALID};
+enum dyn_obj_flg {UNCERTAIN, STATIC, CASE1, CASE2, CASE3, SELF, INVALID};
 
 // Point struct in range image
 struct point_soph
@@ -216,11 +226,14 @@ public:
     float*           max_range_static = nullptr;
     int*             max_range_index_all = nullptr;
     int*             min_range_index_all = nullptr;
-    std::vector<std::vector<int>> cluster_poses_vec;
+    bool*            ground_all = nullptr;
+    float*           incident_all = nullptr;
+    int*             cluster_idx_all = nullptr;
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr xyzrgb_cloud_pcptr;
+
+    std::vector<std::vector<int>> cluster_poses_vec; // cluster_ind --> pixel_pos
 
     std::vector<int> index_vector; // Index of point in rangeimage
-
-    std::vector<std::vector<int>>   cluster_index_vector; // Cluster index --> point index
 
     typedef boost::shared_ptr<RangeImage> Ptr;
 
@@ -242,8 +255,18 @@ public:
         fill_n(max_range_static, MAX_2D_N, 0.0);
         max_range_index_all = new int[MAX_2D_N];
         min_range_index_all = new int[MAX_2D_N];
+        ground_all = new bool[MAX_2D_N];
+        incident_all = new float[MAX_2D_N];
+        cluster_idx_all = new int[MAX_2D_N];
         fill_n(min_range_index_all, MAX_2D_N, -1);
         fill_n(max_range_index_all, MAX_2D_N, -1);
+        fill_n(ground_all, MAX_2D_N, false);
+        fill_n(incident_all, MAX_2D_N, 0.0);
+        fill_n(cluster_idx_all, MAX_2D_N, -1);
+
+        // xyzrgb_cloud.resize(MAX_2D_N);
+        xyzrgb_cloud_pcptr.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
+        xyzrgb_cloud_pcptr->resize(MAX_2D_N);
 
         map_index = -1;
         index_vector.assign(MAX_2D_N, 0);
@@ -271,8 +294,18 @@ public:
         fill_n(max_range_static, MAX_2D_N, 0.0);
         max_range_index_all = new int[MAX_2D_N];
         min_range_index_all = new int[MAX_2D_N];
+        ground_all = new bool[MAX_2D_N];
+        incident_all = new float[MAX_2D_N];
+        cluster_idx_all = new int[MAX_2D_N];
         fill_n(min_range_index_all, MAX_2D_N, -1);
         fill_n(max_range_index_all, MAX_2D_N, -1);
+        fill_n(ground_all, MAX_2D_N, false);
+        fill_n(incident_all, MAX_2D_N, 0.0);
+        fill_n(cluster_idx_all, MAX_2D_N, -1);
+        
+        xyzrgb_cloud_pcptr.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
+        xyzrgb_cloud_pcptr->resize(MAX_2D_N);
+
         map_index = frame;
         index_vector.assign(MAX_2D_N, 0);
         for (int i = 0; i < MAX_2D_N; i++) {
@@ -299,7 +332,14 @@ public:
         fill_n(max_range_static, MAX_2D_N, 0.0);
         max_range_index_all = new int[MAX_2D_N];       
         min_range_index_all = new int[MAX_2D_N];
+        ground_all = new bool[MAX_2D_N];
+        incident_all = new float[MAX_2D_N];
+        cluster_idx_all = new int[MAX_2D_N];
         map_index = cur.map_index;      
+
+        xyzrgb_cloud_pcptr.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
+        xyzrgb_cloud_pcptr->resize(MAX_2D_N);
+
         for(int i = 0; i < MAX_2D_N; i++)
         {
             min_range_static[i] = cur.min_range_static[i];
@@ -308,6 +348,9 @@ public:
             max_range_all[i] = cur.max_range_all[i];
             max_range_index_all[i] = cur.max_range_index_all[i];
             min_range_index_all[i] = cur.min_range_index_all[i];
+            ground_all[i] = cur.ground_all[i];
+            incident_all[i] = cur.incident_all[i];
+            cluster_idx_all[i] = cur.cluster_idx_all[i];
         }
         index_vector.assign(MAX_2D_N, 0);
         for (int i = 0; i < MAX_2D_N; i++) {
@@ -325,6 +368,9 @@ public:
         if(max_range_static  != nullptr) delete [] max_range_static;
         if(max_range_index_all  != nullptr) delete [] max_range_index_all;
         if(min_range_index_all  != nullptr) delete [] min_range_index_all;
+        if(ground_all  != nullptr) delete [] ground_all;
+        if(incident_all  != nullptr) delete [] incident_all;
+        if(cluster_idx_all  != nullptr) delete [] cluster_idx_all;
     }
 
     void Reset(M3D rot, V3D transl, double cur_time, int frame)
@@ -348,8 +394,14 @@ public:
         fill_n(max_range_static, MAX_2D_N, 0.0);
         fill_n(max_range_index_all, MAX_2D_N, -1);
         fill_n(min_range_index_all, MAX_2D_N, -1);
+        fill_n(ground_all, MAX_2D_N, false);
+        fill_n(incident_all, MAX_2D_N, 0.0);
+        fill_n(cluster_idx_all, MAX_2D_N, -1);
 
         cluster_poses_vec.clear();
+
+        xyzrgb_cloud_pcptr->clear();
+        xyzrgb_cloud_pcptr->resize(MAX_2D_N);
     }
 
 };
@@ -362,21 +414,20 @@ class RangePmc{
     void Init(range_pmc_params params);
     void Filter(PointCloudXYZI::Ptr feats_undistort, const M3D & rot_end, const V3D & pos_end, const double & scan_end_time);
     void GetFilteredPoint(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& o_pmc_xyzrgb_pcptr);
-
+    void GetKeyFramePoint(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& o_key_frame_xyzrgb_pcptr);
+    void GetClusterPoint(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& o_cluster_xyzrgb_pcptr);
+    
     public:
 
     // Test
-    bool Case1(point_soph & p);
+    bool Case1(point_soph & p, RangeImage::Ptr range_image_ptr);
     bool Case1Enter(const point_soph & p, const RangeImage &image_info, bool & is_valid);
     
 
     // Range Image Generation
     
     // 시간, rot, transl를 고려하여 range image 생성
-    void GenerateRangeImage(std::vector<point_soph*> &points, double cur_time, M3D rot, V3D transl); 
-    void GenerateRangeImage(point_soph* &points, double cur_time, M3D rot, V3D transl, int len, RangeImage::Ptr range_image_pointer); 
-    void GenerateRangeImage(std::vector<point_soph*> &points, double cur_time, M3D rot, V3D transl, RangeImage::Ptr range_image_pointer); 
-
+    void GenerateRangeImage(std::vector<point_soph*> &points, double cur_time, M3D rot, V3D transl, RangeImage::Ptr range_image_ptr); 
     void GroundSegmentation(RangeImage::Ptr range_image_ptr);
     void ObjectSegmentation(RangeImage::Ptr range_image_ptr);
 
@@ -388,12 +439,12 @@ class RangePmc{
     bool CheckNeighbor(const point_soph & p, const RangeImage &image_info, float &max_range, float &min_range);
 
     //
-    void NeighborAssign(unsigned int neighbor_size);
+    void NeighborAssign(unsigned int hor_neighbor, unsigned int ver_heighbor);
     void LabelComponents(RangeImage::Ptr range_image_ptr, uint16_t row, uint16_t col);
     void ResetClustering();
 
     // Output
-    void OutputPmcPC(const std::vector<point_soph*> &points);
+    void OutputPmcPC(const std::vector<point_soph*> &points, const RangeImage::Ptr range_image_ptr);
     void OutputRangeImagesPc();
     cv::Mat GetRangeImageCv();
     cv::Mat GetDynamicImageCv();
@@ -415,8 +466,10 @@ class RangePmc{
     public:
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr pmc_xyzrgb_pcptr_;
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr range_image_xyzrgb_pcptr_;
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cluster_xyzrgb_pcptr_;
+    std::deque<pcl::PointCloud<pcl::PointXYZRGB>::Ptr> range_image_xyzrgb_pcptr_deque_;
 
-    double time_search = 0.0, time_search_0 = 0.0, time_research = 0.0, time_build = 0.0, time_other0 = 0.0, time_total = 0.0, time_total_avr = 0.0;
+    double time_total = 0.0, time_cluster_labeling = 0.0;
     int    pixel_fov_up, pixel_fov_down, pixel_fov_left, pixel_fov_right;
     int    m_i_row_size, m_i_col_size;
     int    occu_time_th = 3, is_occu_time_th = 3, map_index = 0;
@@ -437,7 +490,6 @@ class RangePmc{
     std::vector<uint16_t> m_v_ui16_queue_idx_y;
 
     int i_cluster_idx = 0;
-
 
     // configure;
     private:

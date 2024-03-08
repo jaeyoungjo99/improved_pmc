@@ -3,30 +3,39 @@ topic_name:
   
 # Common variables
 common_variable:
-  lidar_topic_name: /velodyne_points # /ouster/points /velodyne_points
-  lidar_type: velodyne # ouster velodyne
+  lidar_topic_name: /ouster/points # /ouster/points /velodyne_points
+  lidar_type: ouster # ouster velodyne
   projection_mode: Cartesian
   use_init_lat_lon: true # if true, do not need ref below
   ref_latitude: 37.589 # howon 37.589 # pangyo 37.399
   ref_longitude: 127.157 # howon 127.157 # pangyo  127.109
-  novatel_heading_bias_deg: 0.0 # howon 0.6 # pangyo -1.0
+  novatel_heading_bias_deg: -0.5 # howon 0.6 # pangyo -1.0
 
-  ego_to_lidar_transform: [1.2, 0.0, 1.88]
-  ego_to_lidar_rotation: [0.0, 0.0, 0.0]
+  ego_to_lidar_transform:
+    x: 1.2
+    y: 0.0
+    z: 1.8
+  ego_to_lidar_rotation:
+    roll: 0.0
+    pitch: 0.0
+    yaw: 0.0
 
 range_pmc:
-  horizontal_resolution: 0.4 # deg 0.703
-  vertical_resolution: 0.5 # deg 0.5
+  deskewing: true
+  horizontal_resolution: 0.7031 # deg 0.4 0.703
+  vertical_resolution: 0.3543 # deg 0.5 0.351
   min_range: 0.5
   max_range: 50
   range_threshold: 0.2
   max_range_image_num: 10
-  min_occluded_num: 5
-  neighbor_pixel_max: 2
-  min_key_frame_time: 0.2
+  min_occluded_num: 7
+  neighbor_pixel_max: 4
+
+  min_key_frame_time: 0.0
   min_key_frame_rot: 3.0
-  fov_up: 15 # 22.5     15
-  fov_down: -25 # -22.5  -25
+  
+  fov_up: 22.5 # 22.5     15
+  fov_down: -22.5 # -22.5  -25
   fov_left: 180.0
   fov_right: -180.0
   height_filter: false
@@ -34,7 +43,15 @@ range_pmc:
   ground_angle: 5 # deg
 
   dist_threshold_m: 1.0
+  segment_min_point_num: 50
+  segment_valid_point_num: 8
+  segment_valid_line_num: 3
 
+  cluster_level_filtering: true
+
+
+  output_static_point: false
+  output_min_range: true
   debug_image: true
   
 
