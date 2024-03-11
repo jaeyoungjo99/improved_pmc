@@ -34,9 +34,9 @@ void RangePmc::Init(range_pmc_params params){
     pixel_fov_left  = floor((params_.f_fov_left / 180.0*M_PI +  M_PI)       /params_.f_horizontal_resolution);
     pixel_fov_right = floor((params_.f_fov_right/ 180.0*M_PI +  M_PI)       /params_.f_horizontal_resolution);
 
-    m_i_row_size = pixel_fov_up - pixel_fov_down;
-    m_i_col_size = pixel_fov_left - pixel_fov_right;
-    max_pointers_num = params_.i_max_range_image_num;
+    m_i_row_size        = pixel_fov_up - pixel_fov_down;
+    m_i_col_size        = pixel_fov_left - pixel_fov_right;
+    max_pointers_num    = params_.i_max_range_image_num;
     point_soph_pointers.reserve(max_pointers_num); 
 
     cout<<"pixel_fov_up: "<<pixel_fov_up<<endl;
@@ -169,7 +169,7 @@ void RangePmc::Filter(PointCloudXYZI::Ptr feats_undistort, const M3D & rot_end, 
             if (p_cluster_ind >= 0 ){
                 p_cluster_size = new_image_pointer->cluster_poses_vec[p_cluster_ind].size();
                 
-                if(new_image_pointer->xyzrgb_cloud_pcptr->points[p[i].position].b > 2*params_.i_min_occluded_num ){
+                if(new_image_pointer->xyzrgb_cloud_pcptr->points[p[i].position].b > 4 * params_.i_max_range_image_num ){
                     is_dyn = new_image_pointer->xyzrgb_cloud_pcptr->points[p[i].position].g >
                             new_image_pointer->xyzrgb_cloud_pcptr->points[p[i].position].r;
 
@@ -278,6 +278,12 @@ bool RangePmc::Case1(point_soph & p, RangeImage::Ptr range_image_ptr)
             for (auto pixel_pos : range_image_ptr->cluster_poses_vec[p.cluster_ind])
             {
                 if (pixel_pos < MAX_2D_N && pixel_pos >= 0 ){
+                    double min_pos = range_image_ptr->min_range_index_all[pixel_pos];
+                    
+                    // Get Gaussian weight // TODO
+                    double gaussian_weight = GaussianWeight(p.local, range_image_ptr->range_image[pixel_pos][min_pos]->local);
+
+                    if (gaussian_weight < 0.0) continue;
                     if (p.dyn == CASE1) range_image_ptr->xyzrgb_cloud_pcptr->points[pixel_pos].g += 1;
                     if (p.dyn == STATIC) range_image_ptr->xyzrgb_cloud_pcptr->points[pixel_pos].r += 1;
                     range_image_ptr->xyzrgb_cloud_pcptr->points[pixel_pos].b += 1;
@@ -339,9 +345,15 @@ void RangePmc::GenerateRangeImage(std::vector<point_soph*> &points, double cur_t
     std::cout<<"[GenerateRangeImage] cur_point_soph_pointers: "<<cur_point_soph_pointers<<std::endl;
     std::cout<<"[GenerateRangeImage] map_index: "<<map_index<<std::endl;
 
+    int i_invalid_num = 0;
+    float min_ver_angle = FLT_MAX;
+    float max_ver_angle = -FLT_MAX;
     for (int k = 0; k < len; k++)
     { 
         points[k]->GetVec(points[k]->local, params_.f_horizontal_resolution, params_.f_vertical_resolution);
+
+        if (points[k]->vec(1) < min_ver_angle) min_ver_angle = points[k]->vec(1);
+        if (points[k]->vec(1) > max_ver_angle) max_ver_angle = points[k]->vec(1);
         
         // FOV를 벗어난 point는 range image에 할당하지 않음
         if(points[k]->ver_ind > pixel_fov_up || points[k]->ver_ind < pixel_fov_down || \
@@ -349,6 +361,7 @@ void RangePmc::GenerateRangeImage(std::vector<point_soph*> &points, double cur_t
            points[k]->position < 0 || points[k]->position >= MAX_2D_N)
         {
             points[k]->dyn = INVALID;
+            i_invalid_num++;
             continue;
         }
 
@@ -374,6 +387,8 @@ void RangePmc::GenerateRangeImage(std::vector<point_soph*> &points, double cur_t
         }
     }
 
+    std::cout<<"[GenerateRangeImage] min ver angle: "<<min_ver_angle*180/M_PI<< " max: "<< max_ver_angle*180/M_PI << std::endl;
+    std::cout<<"[GenerateRangeImage] Invalid Num: "<<i_invalid_num<<" / "<<len<<std::endl;
     double time_generate_range_image = omp_get_wtime() - t00;
     std::cout<<"[GenerateRangeImage] Total Time: "<< time_generate_range_image*1000.0 << " ms"<<std::endl;
 }
@@ -422,8 +437,8 @@ void RangePmc::GroundSegmentation(RangeImage::Ptr range_image_ptr)
                 ver_dist = u_point.z() - l_point.z();
 
                 hor_dist_ground = sqrt(l_point.x() * l_point.x() + l_point.y() * l_point.y());
-                ver_angle_from_ground = atan2f(l_point.z() + 1.8, hor_dist_ground);
-                ground_margin_angle = atan2f(- l_point.z() - 1.3, hor_dist_ground);
+                ver_angle_from_ground = atan2f(l_point.z() + 1.6, hor_dist_ground);
+                ground_margin_angle = atan2f(- l_point.z() - 1.1, hor_dist_ground);
 
                 v_angle = atan2f(ver_dist,hor_dist);
                 
@@ -531,7 +546,7 @@ void RangePmc::LabelComponents(RangeImage::Ptr range_image_ptr, uint16_t row, ui
 
     std::vector<int> cluster_pos_vec;
 
-    std::vector<std::pair<int, int>> pos_min_pos_vec;
+    std::vector<std::pair<int, int>> pos_min_pos_vec; // (position, min_range_position) vec
 
     while(queueSize > 0)
     {
@@ -544,6 +559,7 @@ void RangePmc::LabelComponents(RangeImage::Ptr range_image_ptr, uint16_t row, ui
         from_pos = fromIndX * MAX_1D_HALF + fromIndY;
         from_min_pos = range_image_ptr->min_range_index_all[from_pos];
 
+        // 해당 픽셀에 포인트가 없거나, ground이면 skip
         if (range_image_ptr->range_image[from_pos].size() == 0 ||
             range_image_ptr->ground_all[from_pos] == true)
             continue;
@@ -564,13 +580,8 @@ void RangePmc::LabelComponents(RangeImage::Ptr range_image_ptr, uint16_t row, ui
                 continue;
 
             // Check continuity of col idx
-            if (thisIndX < pixel_fov_right){
-                thisIndX = thisIndX + m_i_col_size;
-            }
-            if (thisIndX >= pixel_fov_left ){
-                thisIndX = thisIndX - m_i_col_size;
-            }
-
+            if (thisIndX < pixel_fov_right) thisIndX = thisIndX + m_i_col_size;
+            if (thisIndX >= pixel_fov_left) thisIndX = thisIndX - m_i_col_size;
 
             this_pos = thisIndX * MAX_1D_HALF + thisIndY;
             this_min_pos = range_image_ptr->min_range_index_all[this_pos];
@@ -655,7 +666,6 @@ void RangePmc::ResetClustering()
     m_v_ui16_queue_idx_x.resize(m_i_col_size*m_i_row_size);
     m_v_ui16_queue_idx_y.clear();
     m_v_ui16_queue_idx_y.resize(m_i_col_size*m_i_row_size);
-    
 }
 
 
@@ -686,6 +696,14 @@ bool RangePmc::KeyFrameCheck(double cur_time, M3D rot, V3D transl)
     }
 
     return false;
+}
+
+inline double RangePmc::GaussianWeight(V3D p1, V3D p2)
+{   
+    double dist = -(p1-p2).norm() + 1.0;
+    if (dist <= 0.0) dist = 0.0;
+    return dist;
+    return (double)exp(-0.5 * pow((p1-p2).norm()/0.5, 2));
 }
 
 // 해당 Range Image Vertical FOV 안에 있는 포인트 인지 확인
@@ -780,12 +798,13 @@ void RangePmc::OutputPmcPC(const std::vector<point_soph*> &points, const RangeIm
         po.y = points[i]->local[1];
         po.z = points[i]->local[2]; 
 
-        int min_pos = range_image_ptr->min_range_index_all[points[i]->position];
-
-        if(params_.b_output_min_range == true && points[i]->vec(2) > range_image_ptr->min_range_all[points[i]->position] + 10E-5)
+        // 현재 포인트의 거리가 최소거리보다 크다면 (대표값이 아니라면)
+        if(params_.b_output_min_range == true && 
+           points[i]->vec(2) > range_image_ptr->min_range_all[points[i]->position] + 10E-5)
             continue;
 
-        if(params_.b_output_static_point == true && points[i]->dyn != STATIC)
+        if(params_.b_output_static_point == true && 
+           points[i]->dyn != STATIC)
             continue;
         
         switch(points[i]->dyn)
@@ -800,7 +819,7 @@ void RangePmc::OutputPmcPC(const std::vector<point_soph*> &points, const RangeIm
                 po.g = 255;
                 po.b = 0;
                 break;
-            default: // Blue
+            default: // Blue. UNKNOWN, INVALID
                 po.r = 0;
                 po.g = 0;
                 po.b = 255;
@@ -821,9 +840,10 @@ void RangePmc::OutputPmcPC(const std::vector<point_soph*> &points, const RangeIm
             po.y = points[i]->glob[1];
             po.z = points[i]->glob[2];
 
-            if(params_.b_output_static_point == true && points[i]->dyn != STATIC)
+            if(params_.b_output_static_point == true &&
+               points[i]->dyn != STATIC)
                 continue;
-                
+
             switch(points[i]->dyn)
             {
                 case STATIC: // Red
@@ -836,7 +856,7 @@ void RangePmc::OutputPmcPC(const std::vector<point_soph*> &points, const RangeIm
                     po.g = 255;
                     po.b = 0;
                     break;
-                default: // Blue
+                default: // Blue. UNKNOWN, INVALID
                     po.r = 0;
                     po.g = 0;
                     po.b = 255;

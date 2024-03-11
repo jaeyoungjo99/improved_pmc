@@ -59,7 +59,7 @@ class RangePmcWrapper{
                 i_xyzirt_point_cloud_ptr_->points[i].time += 0.1;
             }
         }
-        else{
+        else if (cfg_str_lidar_type_ == "ouster"){
             pcl::fromROSMsg(*msg, *i_tmp_ouster_cloud_ptr_);
             pcl_conversions::toPCL(msg->header, i_xyzirt_point_cloud_ptr_->header);
 
@@ -78,6 +78,24 @@ class RangePmcWrapper{
 
             }
 
+        }
+        else if (cfg_str_lidar_type_ == "kitti"){
+            pcl::fromROSMsg(*msg, *i_tmp_kitti_cloud_ptr_);
+            pcl_conversions::toPCL(msg->header, i_xyzirt_point_cloud_ptr_->header);
+
+            i_xyzirt_point_cloud_ptr_->points.resize(i_tmp_kitti_cloud_ptr_->size());
+            i_xyzirt_point_cloud_ptr_->is_dense = i_tmp_kitti_cloud_ptr_->is_dense;
+            for (size_t i = 0; i < i_tmp_kitti_cloud_ptr_->size(); i++)
+            {
+                auto &src = i_tmp_kitti_cloud_ptr_->points[i];
+                auto &dst = i_xyzirt_point_cloud_ptr_->points[i];
+                dst.x = src.x;
+                dst.y = src.y;
+                dst.z = src.z;
+                dst.intensity = src.intensity;
+                dst.ring = src.ring;
+                dst.time = src.time;
+            }   
         }
 
         if(RunDeskewing(i_xyzirt_point_cloud_ptr_, i_xyzirt_point_cloud_deskwed_ptr_) == false)
@@ -116,7 +134,14 @@ class RangePmcWrapper{
         RangePmcPtr->GetKeyFramePoint(o_key_frame_xyzrgb_pcptr_);
         RangePmcPtr->GetClusterPoint(o_cluster_xyzrgb_pcptr_);
 
-        if(cfg_b_debug_image_ == false) return;
+        UpdatePmcPointCloud(o_pmc_xyzrgb_pcptr_);
+        UpdateKeyFramePointCloud(o_key_frame_xyzrgb_pcptr_);
+        UpdateClusterPointCloud(o_cluster_xyzrgb_pcptr_);
+
+        if(cfg_b_debug_image_ == false){
+            Publish();
+            return;
+        };
 
         std_msgs::Header img_header_range;
         cv_bridge::CvImage img_bridge_range, img_bridge_incident;
@@ -198,9 +223,7 @@ class RangePmcWrapper{
         img_bridge_range = cv_bridge::CvImage(img_header_range, sensor_msgs::image_encodings::MONO8, mat_vis_ground_img );
         img_bridge_range.toImageMsg(o_ground_image_msg_);
 
-        UpdatePmcPointCloud(o_pmc_xyzrgb_pcptr_);
-        UpdateKeyFramePointCloud(o_key_frame_xyzrgb_pcptr_);
-        UpdateClusterPointCloud(o_cluster_xyzrgb_pcptr_);
+
         Publish();
     }
     inline void CallbackOdometry(const geometry_msgs::PoseWithCovarianceStamped& cur_odom)
@@ -243,6 +266,45 @@ class RangePmcWrapper{
 
     }
 
+    inline void CallbackKittiGeo(const geometry_msgs::PoseStamped& cur_odom)
+    {
+        std::lock_guard<std::mutex> lock(mutex_odometry_);
+
+        Eigen::Quaterniond cur_q;
+        geometry_msgs::Quaternion tmp_q;
+        // tmp_q = cur_odom.pose.pose.orientation;
+        // tf::quaternionMsgToEigen(tmp_q, cur_q);
+        // cur_rot = cur_q.matrix();
+
+        Eigen::Quaterniond eigen_quat(cur_odom.pose.orientation.w, cur_odom.pose.orientation.x, cur_odom.pose.orientation.y, cur_odom.pose.orientation.z);
+        cur_rot = eigen_quat.toRotationMatrix();
+        
+        // ego_frame에서 LiDAR까지의 변위를 고려한 LiDAR의 현재 위치를 계산합니다.
+        Eigen::Vector3d lidar_offset(cfg_vec_f_ego_to_lidar_[0], cfg_vec_f_ego_to_lidar_[1], cfg_vec_f_ego_to_lidar_[2]);
+        Eigen::Vector3d cur_pos_ego(cur_odom.pose.position.x, 
+                                    cur_odom.pose.position.y, 
+                                    cur_odom.pose.position.z);
+        
+        // LiDAR 위치를 업데이트합니다.
+        cur_pos = cur_pos_ego + cur_rot * lidar_offset;
+
+
+        Eigen::Affine3d transform = Eigen::Affine3d::Identity();
+        // transform.rotate(cur_rot);
+        // transform.translate(cur_pos);
+
+        transform = Eigen::Translation3d(cur_pos) * Eigen::AngleAxisd(cur_rot);
+        Eigen::Affine3f iter_lidar_pose = transform.cast<float>();
+
+        deque_time_lidar_pose_.push_back(std::make_pair(cur_odom.header.stamp.toSec() + 0.1 ,iter_lidar_pose));
+        // std::cout<<"IMU Time pushback: "<<cur_odom.header.stamp.toSec()<<std::endl;
+
+        while(deque_time_lidar_pose_.size() > 200) deque_time_lidar_pose_.pop_front();
+
+
+        is_odom_init = true;
+    }
+
     void UpdatePmcPointCloud(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud);
     void UpdateKeyFramePointCloud(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud);
     void UpdateClusterPointCloud(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud);
@@ -278,6 +340,7 @@ class RangePmcWrapper{
         ros::Time main_lidar_time_;
 
         pcl::PointCloud<OusterPointXYZIRT>::Ptr i_tmp_ouster_cloud_ptr_;
+        pcl::PointCloud<PointXYZIRGBRTLIS>::Ptr i_tmp_kitti_cloud_ptr_;
         pcl::PointCloud<PointXYZIRT>::Ptr i_xyzirt_point_cloud_ptr_;
         pcl::PointCloud<PointXYZIRT>::Ptr i_xyzirt_point_cloud_deskwed_ptr_;
         PointCloudXYZI::Ptr i_xyzin_point_cloud_ptr_;
@@ -342,6 +405,7 @@ class RangePmcWrapper{
     // configure;
     private:
 
+        string cfg_str_dataset_;
         string cfg_str_lidar_topic_name_;
         string cfg_str_odom_topic_name_;
         string cfg_str_lidar_type_;

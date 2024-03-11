@@ -58,4 +58,48 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(OusterPointXYZIRT,
     (uint16_t, ring, ring) (uint16_t, ambient, ambient) (uint32_t, range, range)
 )
 
+struct EIGEN_ALIGN16 PointXYZIRGBRTLIS
+{
+    PCL_ADD_POINT4D
+    PCL_ADD_INTENSITY
+    PCL_ADD_RGB
+    std::uint16_t ring;
+    float time;
+    std::uint16_t label;
+    std::uint32_t index;
+   std::uint16_t scan_id;
+    PCL_MAKE_ALIGNED_OPERATOR_NEW   // make sure our new allocators are aligned
+} ;                    // enforce SSE padding for correct memory alignment
+
+POINT_CLOUD_REGISTER_POINT_STRUCT(PointXYZIRGBRTLIS,
+                                (float, x, x) (float, y, y) (float, z, z) 
+                                (float, intensity, intensity)
+                                (std::uint32_t, rgb, rgb)
+                                (std::uint16_t, ring, ring)
+                                (float, time, time)
+                                (std::uint16_t, label, label)
+                                (std::uint32_t, index, index)
+                                (std::uint16_t, scan_id, scan_id))
+
+/*
+if(gt_label >= 0 && gt_label <= 1) // unlabeled
+{
+    continue;
+}
+else if(gt_label >= 9 && gt_label <= 99) // static
+{
+    pmc_save_pcptr->points[idx].motion_gt = 0;
+    gt_is_dynamic = false;
+}
+else if(gt_label >= 251 && gt_label <= 259)
+{
+    pmc_save_pcptr->points[idx].motion_gt = 1;
+    gt_is_dynamic = true;
+}
+else
+{
+    continue;
+}
+*/
+
 #endif

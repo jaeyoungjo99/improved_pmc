@@ -8,10 +8,13 @@ NovatelConverter::~NovatelConverter(){};
 void NovatelConverter::Init(){
     ROS_INFO("Init function");
     NodeHandle nh;
-    
+
     if (!nh.getParam("/topic_name/vehicle_state", str_ego_pose_msg_)) {
         str_ego_pose_msg_ = "";
     }  
+    if (!nh.getParam("/common_variable/dataset", str_dataset_)) {
+        str_dataset_ = "novatel";
+    }   
     if (!nh.getParam("/common_variable/projection_mode", projection_mode_)) {
         projection_mode_ = "";
     }  
@@ -29,6 +32,7 @@ void NovatelConverter::Init(){
     }  
 
     ROS_INFO_STREAM("projection_mode_ "<<projection_mode_);
+    ROS_INFO_STREAM("str_dataset_ "<<str_dataset_);
 
     if(b_use_init_lat_lon_ = false){
         ROS_INFO_STREAM("ref_latitude_ "<<ref_latitude_);
@@ -38,6 +42,7 @@ void NovatelConverter::Init(){
     }
 
     sub_novatel_inspvax_ = nh.subscribe("novatel/oem7/inspvax", 1, &NovatelConverter::CallbackINSPVAX, this);
+    sub_kitti_geo_ = nh.subscribe("/ground_truth", 1, &NovatelConverter::CallbackKittiGeo, this);
     pub_vehicle_state_ = nh.advertise<autoku_msgs::VehicleState>("/app/loc/vehicle_state", 10);
     pub_ego_marker_ = nh.advertise<visualization_msgs::Marker>("/app/loc/ego_marker", 1);
     pub_ego_cov_marker_ = nh.advertise<visualization_msgs::Marker>("/app/loc/ego_cov_marker", 1);
@@ -85,9 +90,21 @@ void NovatelConverter::UpdateVehicleState(){
     if(b_is_ref_init_ == false) return;
 
 
-    o_rviz_pos_type_ = UpdateNovatelPosTypeText(i_novatel_inspvax_);
-    UpdateEgoCovMarker(i_novatel_inspvax_);
-    UpdateEgoGeo(i_novatel_inspvax_);
+    if(str_dataset_ == "novatel"){
+        o_rviz_pos_type_ = UpdateNovatelPosTypeText(i_novatel_inspvax_);
+        UpdateEgoCovMarker(i_novatel_inspvax_);
+        UpdateEgoGeo(i_novatel_inspvax_);
+    }
+    else{
+        geometry_msgs::PoseWithCovarianceStamped ego_geo;
+
+        ego_geo.header.stamp = i_kitti_geo_.header.stamp;
+        ego_geo.header.frame_id = "ego_frame";
+        ego_geo.pose.pose.position = i_kitti_geo_.pose.position;
+        ego_geo.pose.pose.orientation = i_kitti_geo_.pose.orientation;
+        
+        o_novatel_ego_geo_ = ego_geo;
+    }
 
 }
 
@@ -216,6 +233,13 @@ void NovatelConverter::CallbackINSPVAX(const novatel_oem7_msgs::INSPVAX::ConstPt
         b_is_ref_init_ = true;
     }
     b_is_new_msg_ = true;
+}
+
+void NovatelConverter::CallbackKittiGeo(const geometry_msgs::PoseStamped::ConstPtr& msg)
+{
+    i_kitti_geo_ = *msg;
+    b_is_new_msg_ = true;
+    b_is_ref_init_ = true;
 }
 
 int main(int argc, char **argv) {

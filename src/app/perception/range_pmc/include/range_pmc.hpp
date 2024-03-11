@@ -50,11 +50,18 @@ using namespace std;
 // #define MAX_1D_HALF    (360)        // maximum vertical channel num of Range Image. pi / vertical_resolution
 // #define MAX_POINT      (648000)
 
-// Ouster 128-512
-#define MAX_2D_N       (281600)     // MAX_1D * MAX_1D_HALF
-#define MAX_1D         (512)       // maximum horizontal point of Range Image.     2pi / horizontal_resolution
-#define MAX_1D_HALF    (550)        // maximum vertical channel num of Range Image. pi / vertical_resolution
-#define MAX_POINT      (281600)
+// // Ouster 128-512
+// #define MAX_2D_N       (260096)     // MAX_1D * MAX_1D_HALF
+// #define MAX_1D         (512)       // maximum horizontal point of Range Image.     2pi / horizontal_resolution
+// #define MAX_1D_HALF    (508)        // maximum vertical channel num of Range Image. pi / vertical_resolution
+// #define MAX_POINT      (260096)
+
+// KITTI
+#define MAX_2D_N       (937350)     // MAX_1D * MAX_1D_HALF
+#define MAX_1D         (2083)       // maximum horizontal point of Range Image.     2pi / horizontal_resolution
+#define MAX_1D_HALF    (450)        // maximum vertical channel num of Range Image. pi / vertical_resolution
+#define MAX_POINT      (937350)
+
 
 struct range_pmc_params{
     float f_horizontal_resolution;
@@ -109,7 +116,7 @@ struct point_soph
     int         hor_ind;
     V3F         vec; // horizontal angle, vertical angle, distance
     int         ver_ind;
-    int         cluster_ind;
+    int         cluster_ind; // 기본 -1. 검색되면 -2, 할당되면 0 이상 
     bool        ground;
     int         position; // Point index in range image
     double      time;
@@ -434,11 +441,12 @@ class RangePmc{
     // Utils
     void SphericalProjection(point_soph &p, int range_index, const M3D &rot, const V3D &transl, point_soph &p_spherical);
     bool KeyFrameCheck(double cur_time, M3D rot, V3D transl);
+    inline double GaussianWeight(V3D p1, V3D p2);
 
     bool CheckVerFoV(const point_soph & p, const RangeImage &image_info);
     bool CheckNeighbor(const point_soph & p, const RangeImage &image_info, float &max_range, float &min_range);
 
-    //
+    // Clustering Functions
     void NeighborAssign(unsigned int hor_neighbor, unsigned int ver_heighbor);
     void LabelComponents(RangeImage::Ptr range_image_ptr, uint16_t row, uint16_t col);
     void ResetClustering();

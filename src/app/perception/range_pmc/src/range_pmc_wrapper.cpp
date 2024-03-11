@@ -14,6 +14,7 @@ void RangePmcWrapper::Init(){
     cfg_vec_f_ego_to_lidar_.resize(3);
 
     if (!nh.getParam("/topic_name/vehicle_state", cfg_str_odom_topic_name_)) cfg_str_odom_topic_name_ = "";
+    if (!nh.getParam("/common_variable/dataset", cfg_str_dataset_)) cfg_str_dataset_ = "novatel";
     if (!nh.getParam("/common_variable/lidar_topic_name", cfg_str_lidar_topic_name_)) cfg_str_lidar_topic_name_ = "";
     if (!nh.getParam("/common_variable/lidar_type", cfg_str_lidar_type_)) cfg_str_lidar_type_ = "velodyne";
     if (!nh.getParam("/common_variable/ego_to_lidar_rotation/x", cfg_vec_f_ego_to_lidar_[0])) cfg_vec_f_ego_to_lidar_[0] = 1.2;
@@ -81,7 +82,11 @@ void RangePmcWrapper::Init(){
 
 
     sub_point_cloud_        = nh.subscribe(cfg_str_lidar_topic_name_, 1, &RangePmcWrapper::CallbackPointCloud, this);
-    sub_odometry_           = nh.subscribe(cfg_str_odom_topic_name_, 1, &RangePmcWrapper::CallbackOdometry, this);
+
+    if(cfg_str_dataset_ == "novatel")
+        sub_odometry_           = nh.subscribe(cfg_str_odom_topic_name_, 1, &RangePmcWrapper::CallbackOdometry, this);
+    else
+        sub_odometry_           = nh.subscribe("ground_truth", 1, &RangePmcWrapper::CallbackKittiGeo, this);
 
     pub_pmc_point_cloud_    = nh.advertise<sensor_msgs::PointCloud2>("app/perc/pmc_point_cloud", 10);
     pub_key_frame_point_cloud_  = nh.advertise<sensor_msgs::PointCloud2>("app/perc/key_frame_point_cloud", 10);
@@ -95,6 +100,7 @@ void RangePmcWrapper::Init(){
     pub_angle_image_        = nh.advertise<sensor_msgs::Image>("app/perc/angle_image", 10);
 
     i_tmp_ouster_cloud_ptr_.reset(new pcl::PointCloud<OusterPointXYZIRT>());
+    i_tmp_kitti_cloud_ptr_.reset(new pcl::PointCloud<PointXYZIRGBRTLIS>());
     i_xyzirt_point_cloud_ptr_.reset(new pcl::PointCloud<PointXYZIRT>());
     i_xyzirt_point_cloud_deskwed_ptr_.reset(new pcl::PointCloud<PointXYZIRT>());
     i_xyzin_point_cloud_ptr_.reset(new PointCloudXYZI());

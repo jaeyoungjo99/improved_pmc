@@ -48,9 +48,11 @@ class NovatelConverter{
     void Publish();
 
     void CallbackINSPVAX(const novatel_oem7_msgs::INSPVAX::ConstPtr& msg);
+    void CallbackKittiGeo(const geometry_msgs::PoseStamped::ConstPtr& msg);
 
     private:
     ros::Subscriber sub_novatel_inspvax_;
+    ros::Subscriber sub_kitti_geo_;
     ros::Publisher pub_vehicle_state_;
     ros::Publisher pub_ego_marker_;
     ros::Publisher pub_ego_cov_marker_;
@@ -59,6 +61,7 @@ class NovatelConverter{
     ros::Publisher pub_ego_geometry_msg_;
 
     private:
+    std::string str_dataset_ = "";
     std::string str_ego_pose_msg_ = "";
     std::string projection_mode_ = "";
     bool b_use_init_lat_lon_ = false;
@@ -67,6 +70,7 @@ class NovatelConverter{
     double novatel_heading_bias_deg_ = 0.0;
 
     novatel_oem7_msgs::INSPVAX i_novatel_inspvax_;
+    geometry_msgs::PoseStamped i_kitti_geo_;
     autoku_msgs::VehicleState     o_vehicle_state_;
     visualization_msgs::Marker o_ego_marker_msgs_;
     visualization_msgs::Marker o_ego_cov_marker_msgs_;
