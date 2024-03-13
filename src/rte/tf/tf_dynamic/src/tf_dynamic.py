@@ -34,6 +34,7 @@ class TransformFrameDynamic(object):
         
         # Parameters
         self._period = rospy.get_param('/task_period/period_tf_frame')
+        self._dataset = rospy.get_param('/common_variable/dataset')
         self._tf_broadcaster = tf.TransformBroadcaster()
         self.frame_list = []
         self.vehicle_state = PoseWithCovarianceStamped()
@@ -139,6 +140,9 @@ class TransformFrameDynamic(object):
         Update frame function
         """
         update_time = self.vehicle_state.header.stamp
+        if self._dataset == "kitti":
+            update_time += rospy.Duration(0.1)
+
         if self.frame_list is not None:
             for frame in self.frame_list:
                 if frame["type"] != 'static':

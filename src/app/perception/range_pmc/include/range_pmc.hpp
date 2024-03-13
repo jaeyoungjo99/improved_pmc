@@ -62,6 +62,9 @@ using namespace std;
 #define MAX_1D_HALF    (450)        // maximum vertical channel num of Range Image. pi / vertical_resolution
 #define MAX_POINT      (937350)
 
+typedef unsigned char EvidType;
+typedef unsigned short EvidSqaureType;
+static const EvidType MAX_EVIDENCE = 255;
 
 struct range_pmc_params{
     float f_horizontal_resolution;
@@ -86,6 +89,10 @@ struct range_pmc_params{
     int i_segment_valid_point_num;
     int i_segment_valid_line_num;
 
+    float f_moving_confidence;
+    float f_static_confidence;
+    float f_gaussian_sigma;
+
     bool b_cluster_level_filtering;
 
     bool b_output_static_point;
@@ -108,11 +115,12 @@ struct by_size_decent
 typedef std::pair<int, int> PixelCoord;
 typedef std::vector<PixelCoord> Pixels;
 
-enum dyn_obj_flg {UNCERTAIN, STATIC, CASE1, CASE2, CASE3, SELF, INVALID};
+enum dyn_obj_flg {UNKNOWN, STATIC, CASE1, CASE2, CASE3, SELF, INVALID};
 
 // Point struct in range image
 struct point_soph
 {
+    int         ind;
     int         hor_ind;
     V3F         vec; // horizontal angle, vertical angle, distance
     int         ver_ind;
@@ -122,12 +130,21 @@ struct point_soph
     double      time;
     dyn_obj_flg  dyn;
 
+    int         static_count;
+    int         dynamic_count;
+    int         unknown_count;
+    int         total_count;
+
     float       incident; // Incident angle. 0->normal is parrell to beam, pi/2 --> normal is perpendicular to beam
 
     M3D         rot;        // 이 포인트 집합의 대표 rot
     V3D         transl;     // 이 포인트 집합의 대표 transl
     V3D         glob;       // 이 포인트의 global 좌표상의 위치
-    V3D         local;      // 이 포인트의 라이다 좌표상의 위치 
+    V3D         local;      // 이 포인트의 라이다 좌표상의 위치
+
+    uint8_t     r;
+    uint8_t     g;
+    uint8_t     b;
 
     float       intensity;
 
@@ -144,23 +161,37 @@ struct point_soph
         ground      = false;
         incident   = -1.0;
         time       = -1;
+        static_count = 0;
+        dynamic_count = 0;
+        unknown_count = 0;
+        total_count = 0;
         transl.setZero();
         glob.setZero();
         rot.setOnes();
         local.setZero();
+        r = 0;
+        g = 0;
+        b = 255;
     };
     point_soph() // Default Constructor
     {
         vec.setZero();
-        hor_ind  = ver_ind = position = 0;
+        ind = hor_ind  = ver_ind = position = 0;
         cluster_ind = -1;
         ground      = false;
         incident   = -1.0;
         time       = -1;
+        static_count = 0;
+        dynamic_count = 0;
+        unknown_count = 0;
+        total_count = 0;
         transl.setZero();
         glob.setZero();
         rot.setOnes();
         local.setZero();
+        r = 0;
+        g = 0;
+        b = 255;
     };
     point_soph(V3F s, int ind1, int ind2, int pos) // Constructor with s(hor_angle, ver_angle, range) image_index, range_index
     {
@@ -172,14 +203,22 @@ struct point_soph
         incident   = -1.0;
         position = pos;
         time = -1;
+        static_count = 0;
+        dynamic_count = 0;
+        unknown_count = 0;
+        total_count = 0;
         transl.setZero();
         glob.setZero();
         rot.setOnes();
         local.setZero();
+        r = 0;
+        g = 0;
+        b = 255;
     };
     point_soph(const point_soph & cur) // Copy
     {   
         vec = cur.vec;
+        ind = cur.ind;
         hor_ind  = cur.hor_ind;
         ver_ind  = cur.ver_ind;
         cluster_ind = cur.cluster_ind;
@@ -187,11 +226,18 @@ struct point_soph
         incident    = cur.incident;
         position  = cur.position;
         time = cur.time;
+        static_count = cur.static_count;
+        dynamic_count = cur.dynamic_count;
+        unknown_count = cur.unknown_count;
+        total_count = cur.total_count;
         transl = cur.transl;
         glob = cur.glob;
         rot = cur.rot;
         dyn = cur.dyn;
         local = cur.local;
+        r = cur.r;
+        g = cur.g;
+        b = cur.b;
     };
 
     ~point_soph(){
@@ -427,9 +473,9 @@ class RangePmc{
     public:
 
     // Test
-    bool Case1(point_soph & p, RangeImage::Ptr range_image_ptr);
-    bool Case1Enter(const point_soph & p, const RangeImage &image_info, bool & is_valid);
-    
+    void Case1(point_soph & p, RangeImage::Ptr range_image_ptr);
+    bool Case1Enter(const point_soph & p, const RangeImage &image_info, bool & is_valid); 
+    bool Case1Enter(const point_soph & p, const RangeImage &image_info, dyn_obj_flg & p_dyn);
 
     // Range Image Generation
     
@@ -441,7 +487,7 @@ class RangePmc{
     // Utils
     void SphericalProjection(point_soph &p, int range_index, const M3D &rot, const V3D &transl, point_soph &p_spherical);
     bool KeyFrameCheck(double cur_time, M3D rot, V3D transl);
-    inline double GaussianWeight(V3D p1, V3D p2);
+    inline float GaussianWeight(V3D p1, V3D p2);
 
     bool CheckVerFoV(const point_soph & p, const RangeImage &image_info);
     bool CheckNeighbor(const point_soph & p, const RangeImage &image_info, float &max_range, float &min_range);
@@ -450,6 +496,8 @@ class RangePmc{
     void NeighborAssign(unsigned int hor_neighbor, unsigned int ver_heighbor);
     void LabelComponents(RangeImage::Ptr range_image_ptr, uint16_t row, uint16_t col);
     void ResetClustering();
+
+    void DempsterCombination(EvidType* EvidSrc, EvidType* EvidOther);
 
     // Output
     void OutputPmcPC(const std::vector<point_soph*> &points, const RangeImage::Ptr range_image_ptr);
@@ -477,17 +525,19 @@ class RangePmc{
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cluster_xyzrgb_pcptr_;
     std::deque<pcl::PointCloud<pcl::PointXYZRGB>::Ptr> range_image_xyzrgb_pcptr_deque_;
 
-    double time_total = 0.0, time_cluster_labeling = 0.0;
+    double time_total = 0.0, time_cluster_labeling = 0.0, time_demster = 0.0, time_gaussian = 0.0;
     int    pixel_fov_up, pixel_fov_down, pixel_fov_left, pixel_fov_right;
     int    m_i_row_size, m_i_col_size;
     int    occu_time_th = 3, is_occu_time_th = 3, map_index = 0;
 
-    int max_pixel_points = 50; // 픽셀당 최대 포인트 수 
+    int max_pixel_points = 100; // 픽셀당 최대 포인트 수 
 
     bool is_key_frame;
 
     int i_small_incident = 0;
     int i_total_incident = 0;
+    int i_prop_num = 0;
+    int i_gaussian = 0;
 
     private:
     // Object segmentation

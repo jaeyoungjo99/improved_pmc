@@ -112,8 +112,10 @@ void RangePmc::Filter(PointCloudXYZI::Ptr feats_undistort, const M3D & rot_end, 
         V3D p_body(feats_undistort->points[i].x, feats_undistort->points[i].y, feats_undistort->points[i].z); // 라이다 기준 point 위치
         V3D p_glob(rot_end * (p_body) + pos_end); // global point 위치 
 
+        p[i].ind = i; // 포인트 고유 인덱스
+
         p[i].glob = p_glob;        
-        p[i].dyn = UNCERTAIN;
+        p[i].dyn = UNKNOWN;
         p[i].rot = rot_end;
         // p[i].rot = rot_end.transpose();
 
@@ -123,6 +125,10 @@ void RangePmc::Filter(PointCloudXYZI::Ptr feats_undistort, const M3D & rot_end, 
         p[i].intensity = feats_undistort->points[i].intensity;
         p[i].ground = false;
         p[i].cluster_ind = -1;
+
+        p[i].r = 0;
+        p[i].g = 0;
+        p[i].b = 255;
 
         points[i] = &p[i]; // p[i] 의 주소를 저장함
     }
@@ -138,61 +144,84 @@ void RangePmc::Filter(PointCloudXYZI::Ptr feats_undistort, const M3D & rot_end, 
     GenerateRangeImage(points, scan_end_time, rot_end, pos_end, new_image_pointer);
     GroundSegmentation(new_image_pointer);
     ObjectSegmentation(new_image_pointer);
+
+    std::cout<<"Cluster size: "<<new_image_pointer->cluster_poses_vec.size()<<" idx: "<< i_cluster_idx<<std::endl;
     
     // p는 point_soph 객체 배열을 가리키는 포인터
     // PMC 수행 
     double tcase1_start = omp_get_wtime();
     time_cluster_labeling = 0.0;
+    time_demster = 0.0;
+    time_gaussian = 0.0;
 
     i_small_incident = 0;
     i_total_incident = 0;
+    i_prop_num = 0;
+    i_gaussian = 0;
     int i_ground = 0;
     int i_skip_cluster = 0;
     bool is_dyn;
     int p_cluster_ind;
     int p_cluster_size;
+    int p_min_pos_ind;
+    int static_count, dynamic_count, unknown_count, total_count;
     for (auto i : index)
     {   // 한 range image 내부를 iteration
-        
+
+        // 벗어난 포인트 제외
+        if(p[i].position < 0 || p[i].position >= MAX_2D_N) continue;
+
         // Assume 1: Ground is Static
         if (new_image_pointer->ground_all[p[i].position] == true){
             p[i].dyn = STATIC;
+            p[i].r = 255; p[i].g = 0; p[i].b = 0;
             i_ground++;
             continue;
         }
         
         // Clustering에 의한 라벨링이 된 p는 skip
-
         if (params_.b_cluster_level_filtering == true){
             p_cluster_ind = new_image_pointer->cluster_idx_all[p[i].position];
 
             if (p_cluster_ind >= 0 ){
                 p_cluster_size = new_image_pointer->cluster_poses_vec[p_cluster_ind].size();
                 
-                if(new_image_pointer->xyzrgb_cloud_pcptr->points[p[i].position].b > 4 * params_.i_max_range_image_num ){
-                    is_dyn = new_image_pointer->xyzrgb_cloud_pcptr->points[p[i].position].g >
-                            new_image_pointer->xyzrgb_cloud_pcptr->points[p[i].position].r;
+                p_min_pos_ind = new_image_pointer->min_range_index_all[p[i].position];
 
-                    if(is_dyn) p[i].dyn = CASE1;
-                    else p[i].dyn = STATIC;
+                static_count    =  new_image_pointer->range_image[p[i].position][p_min_pos_ind]->r;
+                dynamic_count   =  new_image_pointer->range_image[p[i].position][p_min_pos_ind]->g;
+                unknown_count   =  new_image_pointer->range_image[p[i].position][p_min_pos_ind]->b;
 
+                if(dynamic_count > static_count && dynamic_count > unknown_count){
+                    p[i].dyn = CASE1;
+                    // p[i].r = 0; p[i].g = 255; p[i].b = 0;
                     i_skip_cluster++;
-                    continue; 
+                    continue;
+                }       
+                else if (static_count > dynamic_count && static_count > unknown_count){
+                    p[i].dyn = STATIC;
+                    i_skip_cluster++;
+                    // p[i].r = 255; p[i].g = 0; p[i].b = 0;
+                    continue;
                 }  
+                
             }
         }
 
-
         // p[i]는 value
-        if (Case1(p[i], new_image_pointer) == true){ // p의 vec, hor_ind, ver_ind, position 가 range_image_list[i] 기준으로 바뀜
-            p[i].dyn = CASE1;
-        }   
+        Case1(p[i], new_image_pointer);
     }
+
+    std::cout<<"[Range PMC] Propagated  : "<< i_prop_num <<std::endl;
     std::cout<<"[Range PMC] Ground  Skip: "<< i_ground <<" / "<< size <<std::endl;
     std::cout<<"[Range PMC] Cluster Skip: "<< i_skip_cluster <<" / "<< size <<std::endl;
     std::cout<<"[Range PMC] Small Incident: "<< i_small_incident <<" / "<< i_total_incident<<std::endl;
 
     double tcase1_end = omp_get_wtime() - tcase1_start;
+    std::cout<<"[Range PMC] Case Gussian num  : "<< i_gaussian <<std::endl;
+    std::cout<<"[Range PMC] Case Cluster Gaussian: "<< time_gaussian*1000.0 << " ms"<<std::endl;
+    std::cout<<"[Range PMC] Case Cluster Gaussian mean: "<< time_gaussian*1000.0 / i_gaussian << " ms"<<std::endl;
+    std::cout<<"[Range PMC] Case Cluster Demster: "<< time_demster*1000.0 << " ms"<<std::endl;
     std::cout<<"[Range PMC] Case Cluster Labeling: "<< time_cluster_labeling*1000.0 << " ms"<<std::endl;
     std::cout<<"[Range PMC] Case: "<< tcase1_end*1000.0 << " ms"<<std::endl;
 
@@ -223,14 +252,15 @@ void RangePmc::Filter(PointCloudXYZI::Ptr feats_undistort, const M3D & rot_end, 
     std::cout<<"[Range PMC] Total Time: "<< time_total*1000.0 << " ms"<<std::endl;
 }
 
-bool RangePmc::Case1(point_soph & p, RangeImage::Ptr range_image_ptr)
+void RangePmc::Case1(point_soph & p, RangeImage::Ptr range_image_ptr)
 {
     int range_image_num = range_image_list.size();
-    int occluded_image = range_image_num;
-    int static_image = params_.i_max_range_image_num;
+    int occluded_image = 0;
+    int static_image = 0;
     int valid_image = 0;
-    bool is_valid;
-    bool p_valid = false;
+
+    dyn_obj_flg p_dyn;
+
     for (int i = range_image_num- 1; i >= 0; i--) // point 한개에 대해 range image 탐색. 최근 range image 부터 
     {   
         // p에는 glob이 있어야하고, 이 함수를 통해서 vec, hor_ind, ver_ind, position 가 range_image_list[i] 기준으로 바뀜 
@@ -243,93 +273,166 @@ bool RangePmc::Case1(point_soph & p, RangeImage::Ptr range_image_ptr)
             continue; // range image의 경계를 넘은 point는 iter range image와 맞지 않음 skip
         }
 
-        // 여기서 p는 각 range image에 맞게 이동된 p. p는 같고, range가 바뀜
-        // 판정을 못했거나 현재 포인트가 더 멀면 false
-        if (Case1Enter(p, *range_image_list[i], is_valid) == true)
+        if (Case1Enter(p, *range_image_list[i], p_dyn) == true)
         {   
-            // p is occluding range_image_list[i]
-            p_valid = true;
             valid_image++;
-            static_image -= 1;
+            if (p_dyn == CASE1) occluded_image++;
+            if (p_dyn == STATIC) static_image++;
         }
-        else{ // p is not occluding range image. static or moving away
-            // occluded_image -= 1;
-            if(is_valid == true){
-                p_valid = true;
-                valid_image++;
-            }
+        
+        if (p_dyn == CASE2){
+            // TODO 현재 포인트가 직전 range point보다 먼 경우
+
         }
+
+        // Dempster
+        EvidType SrcEvidence[3] = {(EvidType)p.r, (EvidType)p.g, (EvidType)p.b};
+        if(p_dyn == CASE1){
+            
+            EvidType MovingEvidence[3] = {0, (EvidType)(params_.f_moving_confidence * MAX_EVIDENCE),
+                                            (EvidType)((1. - params_.f_moving_confidence) * MAX_EVIDENCE)};
+            
+            DempsterCombination(SrcEvidence, MovingEvidence);
+
+            p.r = (uint8_t)SrcEvidence[0];
+            p.g = (uint8_t)SrcEvidence[1];
+            p.b = (uint8_t)SrcEvidence[2];
+        }
+        else if (p_dyn == STATIC){
+            EvidType MovingEvidence[3] = {(EvidType)(params_.f_static_confidence * MAX_EVIDENCE), 0,
+                                            (EvidType)((1. - params_.f_static_confidence) * MAX_EVIDENCE)};
+
+            DempsterCombination(SrcEvidence, MovingEvidence);
+            
+            p.r = (uint8_t)SrcEvidence[0];
+            p.g = (uint8_t)SrcEvidence[1];
+            p.b = (uint8_t)SrcEvidence[2];
+        }
+
+
+        // Range Image 돌다가 레이블링 끝나면 break
+        if((p.r > p.g && p.r > p.b) || (p.g > p.r && p.g > p.b)) break;
+
     }
+    // Dempster
+    if(p.r > p.g && p.r > p.b){
+        p.dyn = STATIC;
+    } 
+    else if(p.g > p.r && p.g > p.b){
+        p.dyn = CASE1;
+    } 
+    else{
+        p.dyn = UNKNOWN;
+        return;
+    } 
 
-    if(p_valid == false || valid_image <  params_.i_min_occluded_num / 2){
-        p.dyn = UNCERTAIN;
-        return false;
-    }
+    // if(valid_image <  params_.i_max_range_image_num / 2){
+    //     p.dyn = UNKNOWN;
+    //     return false;
+    // }
 
 
-    if(static_image >= params_.i_min_occluded_num) p.dyn = STATIC;
-    else p.dyn = CASE1;
+    // if(static_image > occluded_image) p.dyn = STATIC;
+    // else p.dyn = CASE1;
 
-    // Cluster Labeling
     
-    if (params_.b_cluster_level_filtering == true){
+    // Cluster Labeling. min pose에만 labeling 함
+    
+    if (params_.b_cluster_level_filtering == true && p.cluster_ind >= 0){
         double t_cluster_labeling_start = omp_get_wtime();
-        if(p.cluster_ind >= 0){
-            for (auto pixel_pos : range_image_ptr->cluster_poses_vec[p.cluster_ind])
-            {
-                if (pixel_pos < MAX_2D_N && pixel_pos >= 0 ){
-                    double min_pos = range_image_ptr->min_range_index_all[pixel_pos];
-                    
-                    // Get Gaussian weight // TODO
-                    double gaussian_weight = GaussianWeight(p.local, range_image_ptr->range_image[pixel_pos][min_pos]->local);
+        double t_demster_start, t_gaussian_start;
 
-                    if (gaussian_weight < 0.0) continue;
-                    if (p.dyn == CASE1) range_image_ptr->xyzrgb_cloud_pcptr->points[pixel_pos].g += 1;
-                    if (p.dyn == STATIC) range_image_ptr->xyzrgb_cloud_pcptr->points[pixel_pos].r += 1;
-                    range_image_ptr->xyzrgb_cloud_pcptr->points[pixel_pos].b += 1;
+        for (const auto pixel_pos : range_image_ptr->cluster_poses_vec[p.cluster_ind])
+        {
+            if (pixel_pos < MAX_2D_N && pixel_pos >= 0 ){
+                t_gaussian_start = omp_get_wtime();
+                int min_pos = range_image_ptr->min_range_index_all[pixel_pos];
+                
+                // Get Gaussian weight
+                float gaussian_weight = GaussianWeight(p.local, range_image_ptr->range_image[pixel_pos][min_pos]->local);
+                i_gaussian++;
+                time_gaussian += omp_get_wtime() - t_gaussian_start;
+
+                i_prop_num++;
+
+                t_demster_start = omp_get_wtime();
+                EvidType SrcEvidence[3] = {(EvidType)range_image_ptr->range_image[pixel_pos][min_pos]->r, 
+                                            (EvidType)range_image_ptr->range_image[pixel_pos][min_pos]->g,
+                                            (EvidType)range_image_ptr->range_image[pixel_pos][min_pos]->b};
+                                            
+                // 이미 분류 끝난 position은 dempster 수행 x
+                if(SrcEvidence[0] > SrcEvidence[2] || SrcEvidence[1] > SrcEvidence[2])
+                    continue;
+                
+                if(p.dyn == CASE1){
+                    
+                    EvidType MovingEvidence[3] = {0, (EvidType)(params_.f_moving_confidence * gaussian_weight * MAX_EVIDENCE),
+                                                  (EvidType)((1. - params_.f_moving_confidence * gaussian_weight) * MAX_EVIDENCE)};
+
+                    
+                    DempsterCombination(SrcEvidence, MovingEvidence);
+
+                    range_image_ptr->range_image[pixel_pos][min_pos]->r = (uint8_t)SrcEvidence[0];
+                    range_image_ptr->range_image[pixel_pos][min_pos]->g = (uint8_t)SrcEvidence[1];
+                    range_image_ptr->range_image[pixel_pos][min_pos]->b = (uint8_t)SrcEvidence[2];
                 }
+                else if (p.dyn == STATIC){
+                    EvidType MovingEvidence[3] = {(EvidType)(params_.f_static_confidence * gaussian_weight * MAX_EVIDENCE), 0,
+                                                  (EvidType)((1. - params_.f_static_confidence * gaussian_weight) * MAX_EVIDENCE)};
+
+                    DempsterCombination(SrcEvidence, MovingEvidence);
+                    
+                    range_image_ptr->range_image[pixel_pos][min_pos]->r = (uint8_t)SrcEvidence[0];
+                    range_image_ptr->range_image[pixel_pos][min_pos]->g = (uint8_t)SrcEvidence[1];
+                    range_image_ptr->range_image[pixel_pos][min_pos]->b = (uint8_t)SrcEvidence[2];
+                }
+                time_demster += omp_get_wtime() - t_demster_start;
             }
         }
+
         time_cluster_labeling += omp_get_wtime() - t_cluster_labeling_start;
     }
-
-    if (p.dyn == CASE1) return true;
-    if (p.dyn == STATIC) return false;
-
-    return false;  
-
 }
 
 // return true if p is occluding previous range images
-bool RangePmc::Case1Enter(const point_soph & p, const RangeImage &image_info, bool & is_valid)
+bool RangePmc::Case1Enter(const point_soph & p, const RangeImage &image_info, dyn_obj_flg & p_dyn)
 {   
     // p는 image_info 기준으로 projection 되어있음
-    
     float max_range = 0, min_range = 0;
-    is_valid = true;
+    p_dyn = UNKNOWN;
 
-    // max_range = image_info.max_range_all[p.position];
+    max_range = image_info.max_range_all[p.position];
     min_range = image_info.min_range_all[p.position];
 
     if(p.ver_ind <= pixel_fov_up && p.ver_ind > pixel_fov_down && \
         p.hor_ind <= pixel_fov_left && p.hor_ind >= pixel_fov_right
         )
     {
-        is_valid = CheckNeighbor(p, image_info, max_range, min_range);
-    }
-    else{
-        // fov에 없거나 neighbor 포인트를 못찾은경우 is_valid = false
-        is_valid = false;
-        return false;
+        CheckNeighbor(p, image_info, max_range, min_range);
     }
  
-    if(min_range < 10E-5){
-        is_valid = false;
+    if(min_range < 10E-5){ // 비교할 포인트를 찾지 못함 
         return false;
     }
 
-    if (p.vec(2) < min_range - params_.f_range_threshold){ // if point is closer than min range
+    int map_ind_gap = map_index - image_info.map_index;
+    if(map_ind_gap < 0) map_ind_gap += params_.i_max_range_image_num;
+    
+    if (p.vec(2) < min_range - params_.f_range_threshold ){ // if point is closer than min range
+        p_dyn = CASE1;
         return true;
+    }
+    else if (p.vec(2) < min_range + params_.f_range_threshold){ // if point is Static
+        p_dyn = STATIC;
+        return true;
+    }
+    else if (map_ind_gap <= 1){
+        p_dyn = CASE2;
+        return true;
+    }
+    else{
+        p_dyn = UNKNOWN;
+        return false;
     }
 
     return false;
@@ -370,18 +473,18 @@ void RangePmc::GenerateRangeImage(std::vector<point_soph*> &points, double cur_t
             range_image_ptr->range_image[points[k]->position].push_back(points[k]); // 주소를 뒤에 추가함 
 
             // 이 포인트의 range가 픽셀 내 모든 포인트보다 크다면 
-            // if (points[k]->vec(2) > range_image_ptr->max_range_all[points[k]->position])  
-            // {
-            //     range_image_ptr->max_range_all[points[k]->position] = points[k]->vec(2); // 최대 range 교체
-            //     range_image_ptr->max_range_index_all[points[k]->position] = range_image_ptr->range_image[points[k]->position].size()-1;
-            // }
+            if (points[k]->vec(2) > range_image_ptr->max_range_all[points[k]->position])  
+            {
+                range_image_ptr->max_range_all[points[k]->position] = points[k]->vec(2); // 최대 range 교체
+                range_image_ptr->max_range_index_all[points[k]->position] = range_image_ptr->range_image[points[k]->position].size()-1;
+            }
 
             // 이 포인트의 range가 픽셀 내 모든 포인트보다 작다면, 혹은 min_range_all가 0이라면
             if (points[k]->vec(2) < range_image_ptr->min_range_all[points[k]->position] ||\
                 range_image_ptr->min_range_all[points[k]->position] < 10E-5)  
             {
                 range_image_ptr->min_range_all[points[k]->position] = points[k]->vec(2); // 최소 range 교체
-                range_image_ptr->min_range_index_all[points[k]->position] = range_image_ptr->range_image[points[k]->position].size()-1;
+                range_image_ptr->min_range_index_all[points[k]->position] = range_image_ptr->range_image[points[k]->position].size() - 1;
             }
 
         }
@@ -593,17 +696,9 @@ void RangePmc::LabelComponents(RangeImage::Ptr range_image_ptr, uint16_t row, ui
                 range_image_ptr->range_image[this_pos][this_min_pos]->cluster_ind != -1)
                 continue;            
 
-            f_longer_range_m = std::max(range_image_ptr->min_range_all[from_pos],
-                          range_image_ptr->min_range_all[this_pos]);
-
             f_distance_btw_point_m = (range_image_ptr->range_image[from_pos][from_min_pos]->local - 
-                                        range_image_ptr->range_image[this_pos][this_min_pos]->local).norm();
+                                      range_image_ptr->range_image[this_pos][this_min_pos]->local).norm();
 
-
-            if ((*iter).second == 0) // horizontal direction
-                dist_threshold_m = params_.f_dist_threshold_m/2.0 * std::max(1.0, f_longer_range_m/5.0);
-            else
-                dist_threshold_m = params_.f_dist_threshold_m * std::max(1.0, f_longer_range_m/5.0);
 
             dist_threshold_m = params_.f_dist_threshold_m; // Debug
 
@@ -616,11 +711,10 @@ void RangePmc::LabelComponents(RangeImage::Ptr range_image_ptr, uint16_t row, ui
                 ++queueSize;
                 ++queueEndInd;
 
-                range_image_ptr->range_image[this_pos][this_min_pos]->cluster_ind = -2;
+                range_image_ptr->range_image[this_pos][this_min_pos]->cluster_ind = -2; // 탐색 되었음 라벨링 
 
                 lineCountFlag[thisIndY - pixel_fov_down] = true;
 
-                // cluster_pos_vec.push_back(this_pos);
                 pos_min_pos_vec.push_back(make_pair(this_pos, this_min_pos));
 
                 ++allPushedIndSize;
@@ -637,7 +731,7 @@ void RangePmc::LabelComponents(RangeImage::Ptr range_image_ptr, uint16_t row, ui
     else if (allPushedIndSize >= params_.i_segment_valid_point_num)
     {
         int lineCount = 0;
-        for (int i = pixel_fov_down; i < pixel_fov_up; ++i)
+        for (int i = 0; i < m_i_row_size; ++i)
             if (lineCountFlag[i] == true)
                 ++lineCount;
 
@@ -646,7 +740,7 @@ void RangePmc::LabelComponents(RangeImage::Ptr range_image_ptr, uint16_t row, ui
     }
 
     // segment is valid, mark these points
-    if (feasibleSegment == true)
+    if (feasibleSegment == true && pos_min_pos_vec.size() > 0)
     {
         for (auto pos_min_pos : pos_min_pos_vec){
             range_image_ptr->range_image[pos_min_pos.first][pos_min_pos.second]->cluster_ind = i_cluster_idx;
@@ -666,6 +760,36 @@ void RangePmc::ResetClustering()
     m_v_ui16_queue_idx_x.resize(m_i_col_size*m_i_row_size);
     m_v_ui16_queue_idx_y.clear();
     m_v_ui16_queue_idx_y.resize(m_i_col_size*m_i_row_size);
+}
+
+void RangePmc::DempsterCombination(EvidType* EvidSrc, EvidType* EvidOther) {
+    // Common denominator
+    EvidSqaureType CommDen = (EvidSqaureType)MAX_EVIDENCE * MAX_EVIDENCE -
+                             (EvidSqaureType)EvidSrc[0] * (EvidSqaureType)EvidOther[1] -
+                             (EvidSqaureType)EvidSrc[1] * (EvidSqaureType)EvidOther[0];
+
+    if (CommDen == 0) {
+        EvidSrc[2] = (EvidType)MAX_EVIDENCE;
+        EvidSrc[1] = 0;
+        EvidSrc[0] = 0;
+        return;
+    }
+
+    EvidSqaureType tmp_0 = ((EvidSqaureType)EvidSrc[0] * (EvidSqaureType)EvidOther[2] +
+                            (EvidSqaureType)EvidSrc[2] * (EvidSqaureType)EvidOther[0] +
+                            (EvidSqaureType)EvidSrc[0] * (EvidSqaureType)EvidOther[0]) *
+                           (EvidSqaureType)MAX_EVIDENCE / CommDen;
+
+    EvidSqaureType tmp_1 = ((EvidSqaureType)EvidSrc[1] * (EvidSqaureType)EvidOther[2] +
+                            (EvidSqaureType)EvidSrc[2] * (EvidSqaureType)EvidOther[1] +
+                            (EvidSqaureType)EvidSrc[1] * (EvidSqaureType)EvidOther[1]) *
+                           (EvidSqaureType)MAX_EVIDENCE / CommDen;
+
+    EvidSqaureType tmp_2 = (EvidSqaureType)MAX_EVIDENCE - tmp_1 - tmp_0;
+
+    EvidSrc[0] = (EvidType)tmp_0;
+    EvidSrc[1] = (EvidType)tmp_1;
+    EvidSrc[2] = (EvidType)tmp_2;
 }
 
 
@@ -698,12 +822,12 @@ bool RangePmc::KeyFrameCheck(double cur_time, M3D rot, V3D transl)
     return false;
 }
 
-inline double RangePmc::GaussianWeight(V3D p1, V3D p2)
+inline float RangePmc::GaussianWeight(V3D p1, V3D p2)
 {   
-    double dist = -(p1-p2).norm() + 1.0;
-    if (dist <= 0.0) dist = 0.0;
-    return dist;
-    return (double)exp(-0.5 * pow((p1-p2).norm()/0.5, 2));
+    // float weight = -(p1-p2).norm() / 10.0 + 1.0;
+    // if (weight <= 0.0) weight = 0.0;
+    // return weight;
+    return (float)exp(-0.5 * pow((p1-p2).norm()/params_.f_gaussian_sigma, 2));
 }
 
 // 해당 Range Image Vertical FOV 안에 있는 포인트 인지 확인
@@ -766,7 +890,7 @@ bool RangePmc::CheckNeighbor(const point_soph & p, const RangeImage &image_info,
             int cur_pos = (p.hor_ind + i) * MAX_1D_HALF + p.ver_ind + j;
             if(cur_pos < MAX_2D_N && cur_pos >= 0 && image_info.range_image[cur_pos].size() > 0)
             {
-                // float cur_max_range = image_info.max_range_all[cur_pos];
+                float cur_max_range = image_info.max_range_all[cur_pos];
                 float cur_min_range = image_info.min_range_all[cur_pos];
 
                 if(cur_min_range > 10E-5)
@@ -778,6 +902,14 @@ bool RangePmc::CheckNeighbor(const point_soph & p, const RangeImage &image_info,
                 else{
                     min_range = cur_min_range;
                 } 
+
+                if(max_range > 10E-5){
+                    max_range = std::max(cur_max_range, max_range);
+                }
+                else{
+                    max_range = cur_max_range;
+                } 
+
             }
         }
     }
@@ -791,41 +923,173 @@ void RangePmc::OutputPmcPC(const std::vector<point_soph*> &points, const RangeIm
 
     int size = points.size(); // point num
 
+    int p_r, p_g, p_b;
+
     // PMC pcptr
-    for(int i = 0; i < size; i++){
-        pcl::PointXYZRGB po;
-        po.x = points[i]->local[0];
-        po.y = points[i]->local[1];
-        po.z = points[i]->local[2]; 
+    // for(int i = 0; i < size; i++){
+    //     pcl::PointXYZRGB po;
+    //     po.x = points[i]->local[0];
+    //     po.y = points[i]->local[1];
+    //     po.z = points[i]->local[2]; 
 
-        // 현재 포인트의 거리가 최소거리보다 크다면 (대표값이 아니라면)
-        if(params_.b_output_min_range == true && 
-           points[i]->vec(2) > range_image_ptr->min_range_all[points[i]->position] + 10E-5)
-            continue;
+    //     // 현재 포인트의 거리가 최소거리보다 크다면 (대표값이 아니라면)
+    //     if(params_.b_output_min_range == true && 
+    //        points[i]->vec(2) > range_image_ptr->min_range_all[points[i]->position] + 10E-5)
+    //         continue;
 
-        if(params_.b_output_static_point == true && 
-           points[i]->dyn != STATIC)
-            continue;
+    //     if(params_.b_output_static_point == true && 
+    //        points[i]->dyn != STATIC)
+    //         continue;
         
-        switch(points[i]->dyn)
-        {
-            case STATIC: // Red
-                po.r = 255;
-                po.g = 0;
-                po.b = 0;
-                break;
-            case CASE1: // Green
-                po.r = 0;
-                po.g = 255;
-                po.b = 0;
-                break;
-            default: // Blue. UNKNOWN, INVALID
-                po.r = 0;
-                po.g = 0;
-                po.b = 255;
-        }
+    //     switch(points[i]->dyn)
+    //     {
+    //         case STATIC: // Red
+    //             po.r = 255;
+    //             po.g = 0;
+    //             po.b = 0;
+    //             break;
+    //         case CASE1: // Green
+    //             po.r = 0;
+    //             po.g = 255;
+    //             po.b = 0;
+    //             break;
+    //         default: // Blue. UNKNOWN, INVALID
+    //             po.r = 0;
+    //             po.g = 0;
+    //             po.b = 255;
+    //     }
 
-        pmc_xyzrgb_pcptr_->push_back(po);
+    //     pmc_xyzrgb_pcptr_->push_back(po);
+    // }
+
+
+    for(int ver_idx = pixel_fov_down; ver_idx < pixel_fov_up; ver_idx++) {
+        for(int hor_idx = pixel_fov_right; hor_idx < pixel_fov_left; hor_idx++) {
+
+            int iter_pos = hor_idx * MAX_1D_HALF + ver_idx;
+            if(range_image_ptr->range_image[iter_pos].size() > 0){
+                if(params_.b_output_min_range == true){
+                    int min_range_idx = range_image_ptr->min_range_index_all[iter_pos];
+                    pcl::PointXYZRGB po;
+                    po.x = range_image_ptr->range_image[iter_pos][min_range_idx]->local[0];
+                    po.y = range_image_ptr->range_image[iter_pos][min_range_idx]->local[1];
+                    po.z = range_image_ptr->range_image[iter_pos][min_range_idx]->local[2];
+
+                    int r,g,b;
+
+                    // switch (range_image_ptr->range_image[iter_pos][min_range_idx]->dyn)
+                    // {
+                    //     case STATIC: // Red
+                    //         po.r = 255;
+                    //         po.g = 0;
+                    //         po.b = 0;
+                    //         break;
+                    //     case CASE1: // Green
+                    //         po.r = 0;
+                    //         po.g = 255;
+                    //         po.b = 0;
+                    //         break;
+                    //     default: // Blue. UNKNOWN, INVALID
+                    //         po.r = 0;
+                    //         po.g = 0;
+                    //         po.b = 255;
+                    // }
+
+                    // p_r = range_image_ptr->range_image[iter_pos][min_range_idx]->r;
+                    // p_g = range_image_ptr->range_image[iter_pos][min_range_idx]->g;
+                    // p_b = range_image_ptr->range_image[iter_pos][min_range_idx]->b;
+                    // if(p_b > max(p_r, p_g)){
+                    //     po.r = 0;
+                    //     po.g = 0;
+                    //     po.b = 255;
+                    // }
+                    // else if (p_g > p_r){
+                    //     po.r = 0;
+                    //     po.g = 255;
+                    //     po.b = 0;               
+                    // }
+                    // else{
+                    //     po.r = 255;
+                    //     po.g = 0;
+                    //     po.b = 0;
+                    // }   
+
+                    po.r = range_image_ptr->range_image[iter_pos][min_range_idx]->r;
+                    po.g = range_image_ptr->range_image[iter_pos][min_range_idx]->g;
+                    po.b = range_image_ptr->range_image[iter_pos][min_range_idx]->b;
+
+                    // p_r = range_image_ptr->xyzrgb_cloud_pcptr->points[iter_pos].r;
+                    // p_g = range_image_ptr->xyzrgb_cloud_pcptr->points[iter_pos].g;
+                    // p_b = range_image_ptr->xyzrgb_cloud_pcptr->points[iter_pos].b;
+                    // if(p_b > max(p_r, p_g)){
+                    //     po.r = 0;
+                    //     po.g = 0;
+                    //     po.b = 255;
+                    // }
+                    // else if (p_g > p_r){
+                    //     po.r = 0;
+                    //     po.g = 255;
+                    //     po.b = 0;               
+                    // }
+                    // else{
+                    //     po.r = 255;
+                    //     po.g = 0;
+                    //     po.b = 0;
+                    // }
+
+                    // p_r = range_image_ptr->range_image[iter_pos][min_range_idx]->static_count;
+                    // p_g = range_image_ptr->range_image[iter_pos][min_range_idx]->dynamic_count;
+                    // p_b = range_image_ptr->range_image[iter_pos][min_range_idx]->unknown_count;
+                    // if(p_b > max(p_r, p_g)){
+                    //     po.r = 0;
+                    //     po.g = 0;
+                    //     po.b = 255;
+                    // }
+                    // else if (p_g > p_r){
+                    //     po.r = 0;
+                    //     po.g = 255;
+                    //     po.b = 0;               
+                    // }
+                    // else{
+                    //     po.r = 255;
+                    //     po.g = 0;
+                    //     po.b = 0;
+                    // }
+
+                    pmc_xyzrgb_pcptr_->push_back(po);
+                }
+                else{
+                    for(int pixel_idx = 0 ; pixel_idx < range_image_ptr->range_image[iter_pos].size() ; pixel_idx++){
+                        pcl::PointXYZRGB po;
+                        po.x = range_image_ptr->range_image[iter_pos][pixel_idx]->local[0];
+                        po.y = range_image_ptr->range_image[iter_pos][pixel_idx]->local[1];
+                        po.z = range_image_ptr->range_image[iter_pos][pixel_idx]->local[2];
+
+                        int r,g,b;
+                        switch (range_image_ptr->range_image[iter_pos][pixel_idx]->dyn)
+                        {
+                            case STATIC: // Red
+                                po.r = 255;
+                                po.g = 0;
+                                po.b = 0;
+                                break;
+                            case CASE1: // Green
+                                po.r = 0;
+                                po.g = 255;
+                                po.b = 0;
+                                break;
+                            default: // Blue. UNKNOWN, INVALID
+                                po.r = 0;
+                                po.g = 0;
+                                po.b = 255;
+                        }
+                        pmc_xyzrgb_pcptr_->push_back(po);
+                    }
+                }
+
+            }
+
+        }
     }
 
     // Key frame pcptr
@@ -975,7 +1239,7 @@ cv::Mat RangePmc::GetDynamicImageCv()
 {
     cv::Mat mat_dynamic_img((int)(pixel_fov_up - pixel_fov_down), (int)(pixel_fov_left - pixel_fov_right), CV_8UC3, cv::Scalar::all(0));
 
-    if(range_image_list.size()>0){
+    if(range_image_list.size() > 0){
         for(int ver_idx = pixel_fov_down; ver_idx < pixel_fov_up; ver_idx++) {
             for(int hor_idx = pixel_fov_right; hor_idx < pixel_fov_left; hor_idx++) {
 
@@ -1005,7 +1269,7 @@ cv::Mat RangePmc::GetDynamicImageCv()
                     mat_dynamic_img.at<cv::Vec3b>(pixel_fov_up - ver_idx - 1, pixel_fov_left - hor_idx - 1) = cv::Vec3b(r,g,b);
                 }
                 else{
-                    mat_dynamic_img.at<cv::Vec3b>(pixel_fov_up - ver_idx - 1, pixel_fov_left - hor_idx - 1) = cv::Vec3b(0,0,0);
+                    mat_dynamic_img.at<cv::Vec3b>(pixel_fov_up - ver_idx - 1, pixel_fov_left - hor_idx - 1) = cv::Vec3b(0,0,0); // black
                 }
             }
         }

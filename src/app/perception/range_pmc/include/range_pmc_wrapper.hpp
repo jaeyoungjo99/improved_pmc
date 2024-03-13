@@ -433,6 +433,10 @@ class RangePmcWrapper{
         int   cfg_i_segment_min_point_num_;
         int   cfg_i_segment_valid_poiint_num_;
         int   cfg_i_segment_valid_line_num_;
+
+        float cfg_f_moving_confidence_;
+        float cfg_f_static_confidence_;
+        float cfg_f_gaussian_sigma_;
             
         bool cfg_b_cluster_level_filtering_;
 
