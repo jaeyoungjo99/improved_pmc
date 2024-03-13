@@ -437,6 +437,8 @@ class RangePmcWrapper{
         float cfg_f_moving_confidence_;
         float cfg_f_static_confidence_;
         float cfg_f_gaussian_sigma_;
+        float cfg_f_static_gaussian_sigma_;
+        float cfg_f_dynamic_gaussian_sigma_;
             
         bool cfg_b_cluster_level_filtering_;
 

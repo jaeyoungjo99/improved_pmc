@@ -91,7 +91,6 @@ void RangePmc::Filter(PointCloudXYZI::Ptr feats_undistort, const M3D & rot_end, 
     }
 
     pmc_xyzrgb_pcptr_.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
-    // pmc_xyzrgb_pcptr_->reserve(size);
 
     vector<point_soph*> points; // point_soph의 주소들을 저장하기 위한 벡터 
     points.reserve(size);
@@ -141,10 +140,14 @@ void RangePmc::Filter(PointCloudXYZI::Ptr feats_undistort, const M3D & rot_end, 
     // 이때 p는 keyframe이면 순환되는 주소 point_soph_pointers[cur_point_soph_pointers]
     // key frame이 아니면 temp_point_soph_pointer 
     // 이 함수에선 p의 주소를 new_image_pointer에 push_back 함 
+    i_valid_position_num = 0;
     GenerateRangeImage(points, scan_end_time, rot_end, pos_end, new_image_pointer);
     GroundSegmentation(new_image_pointer);
-    ObjectSegmentation(new_image_pointer);
 
+    if(params_.b_cluster_level_filtering == true)
+        ObjectSegmentation(new_image_pointer);
+
+    std::cout<<"i_valid_position_num: "<<i_valid_position_num<<std::endl;
     std::cout<<"Cluster size: "<<new_image_pointer->cluster_poses_vec.size()<<" idx: "<< i_cluster_idx<<std::endl;
     
     // p는 point_soph 객체 배열을 가리키는 포인터
@@ -158,13 +161,17 @@ void RangePmc::Filter(PointCloudXYZI::Ptr feats_undistort, const M3D & rot_end, 
     i_total_incident = 0;
     i_prop_num = 0;
     i_gaussian = 0;
+    i_dempster = 0;
     int i_ground = 0;
     int i_skip_cluster = 0;
+    int i_skip_ind = 0;
     bool is_dyn;
     int p_cluster_ind;
+    int p_ind_in_cluster;
     int p_cluster_size;
     int p_min_pos_ind;
     int static_count, dynamic_count, unknown_count, total_count;
+    int i_skip_size;
     for (auto i : index)
     {   // 한 range image 내부를 iteration
 
@@ -184,9 +191,26 @@ void RangePmc::Filter(PointCloudXYZI::Ptr feats_undistort, const M3D & rot_end, 
             p_cluster_ind = new_image_pointer->cluster_idx_all[p[i].position];
 
             if (p_cluster_ind >= 0 ){
+
                 p_cluster_size = new_image_pointer->cluster_poses_vec[p_cluster_ind].size();
-                
+        
                 p_min_pos_ind = new_image_pointer->min_range_index_all[p[i].position];
+                // p_ind_in_cluster = FindIndexInVector(new_image_pointer->cluster_poses_vec[p_cluster_ind], p[i].position);
+
+                // // std::cout<<"p_ind_in_cluster: "<<p_ind_in_cluster<<std::endl;
+                // if(p_ind_in_cluster % max(p_cluster_size/10,2) != 0){
+                //     i_skip_ind++;
+                //     continue;
+                // }
+
+
+                // Skip point in clustering
+                i_skip_size = sqrt(p_cluster_size) / 4;
+                if(p[i].hor_ind % i_skip_size != 0 || p[i].ver_ind % i_skip_size != 0){
+                    i_skip_ind++;
+                    continue;
+                }
+                
 
                 static_count    =  new_image_pointer->range_image[p[i].position][p_min_pos_ind]->r;
                 dynamic_count   =  new_image_pointer->range_image[p[i].position][p_min_pos_ind]->g;
@@ -214,6 +238,7 @@ void RangePmc::Filter(PointCloudXYZI::Ptr feats_undistort, const M3D & rot_end, 
 
     std::cout<<"[Range PMC] Propagated  : "<< i_prop_num <<std::endl;
     std::cout<<"[Range PMC] Ground  Skip: "<< i_ground <<" / "<< size <<std::endl;
+    std::cout<<"[Range PMC] Skip Index: "<< i_skip_ind <<" / "<< size <<std::endl;
     std::cout<<"[Range PMC] Cluster Skip: "<< i_skip_cluster <<" / "<< size <<std::endl;
     std::cout<<"[Range PMC] Small Incident: "<< i_small_incident <<" / "<< i_total_incident<<std::endl;
 
@@ -222,6 +247,7 @@ void RangePmc::Filter(PointCloudXYZI::Ptr feats_undistort, const M3D & rot_end, 
     std::cout<<"[Range PMC] Case Cluster Gaussian: "<< time_gaussian*1000.0 << " ms"<<std::endl;
     std::cout<<"[Range PMC] Case Cluster Gaussian mean: "<< time_gaussian*1000.0 / i_gaussian << " ms"<<std::endl;
     std::cout<<"[Range PMC] Case Cluster Demster: "<< time_demster*1000.0 << " ms"<<std::endl;
+    std::cout<<"[Range PMC] Case Cluster Demster mean: "<< time_demster*1000.0 / i_dempster<< " ms"<<std::endl;
     std::cout<<"[Range PMC] Case Cluster Labeling: "<< time_cluster_labeling*1000.0 << " ms"<<std::endl;
     std::cout<<"[Range PMC] Case: "<< tcase1_end*1000.0 << " ms"<<std::endl;
 
@@ -255,9 +281,8 @@ void RangePmc::Filter(PointCloudXYZI::Ptr feats_undistort, const M3D & rot_end, 
 void RangePmc::Case1(point_soph & p, RangeImage::Ptr range_image_ptr)
 {
     int range_image_num = range_image_list.size();
-    int occluded_image = 0;
-    int static_image = 0;
     int valid_image = 0;
+    float gaussian_weight;
 
     dyn_obj_flg p_dyn;
 
@@ -276,13 +301,11 @@ void RangePmc::Case1(point_soph & p, RangeImage::Ptr range_image_ptr)
         if (Case1Enter(p, *range_image_list[i], p_dyn) == true)
         {   
             valid_image++;
-            if (p_dyn == CASE1) occluded_image++;
-            if (p_dyn == STATIC) static_image++;
         }
         
         if (p_dyn == CASE2){
             // TODO 현재 포인트가 직전 range point보다 먼 경우
-
+            p_dyn = UNKNOWN; // TODO
         }
 
         // Dempster
@@ -314,6 +337,8 @@ void RangePmc::Case1(point_soph & p, RangeImage::Ptr range_image_ptr)
         if((p.r > p.g && p.r > p.b) || (p.g > p.r && p.g > p.b)) break;
 
     }
+
+
     // Dempster
     if(p.r > p.g && p.r > p.b){
         p.dyn = STATIC;
@@ -326,18 +351,7 @@ void RangePmc::Case1(point_soph & p, RangeImage::Ptr range_image_ptr)
         return;
     } 
 
-    // if(valid_image <  params_.i_max_range_image_num / 2){
-    //     p.dyn = UNKNOWN;
-    //     return false;
-    // }
-
-
-    // if(static_image > occluded_image) p.dyn = STATIC;
-    // else p.dyn = CASE1;
-
-    
     // Cluster Labeling. min pose에만 labeling 함
-    
     if (params_.b_cluster_level_filtering == true && p.cluster_ind >= 0){
         double t_cluster_labeling_start = omp_get_wtime();
         double t_demster_start, t_gaussian_start;
@@ -349,26 +363,33 @@ void RangePmc::Case1(point_soph & p, RangeImage::Ptr range_image_ptr)
                 int min_pos = range_image_ptr->min_range_index_all[pixel_pos];
                 
                 // Get Gaussian weight
-                float gaussian_weight = GaussianWeight(p.local, range_image_ptr->range_image[pixel_pos][min_pos]->local);
+                if(p.dyn == CASE1)
+                    gaussian_weight = GaussianWeight((p.local - range_image_ptr->range_image[pixel_pos][min_pos]->local).norm(), params_.f_dynamic_gaussian_sigma);
+                else
+                    gaussian_weight = GaussianWeight((p.local - range_image_ptr->range_image[pixel_pos][min_pos]->local).norm(), params_.f_static_gaussian_sigma);
+                // gaussian_weight = 1;
                 i_gaussian++;
                 time_gaussian += omp_get_wtime() - t_gaussian_start;
+
+                if(gaussian_weight < 0.1) continue;
 
                 i_prop_num++;
 
                 t_demster_start = omp_get_wtime();
+                i_dempster++;
                 EvidType SrcEvidence[3] = {(EvidType)range_image_ptr->range_image[pixel_pos][min_pos]->r, 
                                             (EvidType)range_image_ptr->range_image[pixel_pos][min_pos]->g,
                                             (EvidType)range_image_ptr->range_image[pixel_pos][min_pos]->b};
                                             
-                // 이미 분류 끝난 position은 dempster 수행 x
-                if(SrcEvidence[0] > SrcEvidence[2] || SrcEvidence[1] > SrcEvidence[2])
-                    continue;
+                // 이미 분류 끝난 position은 dempster 수행 x. 근데 이거 한다고 크게 빨라지지 않음 
+                // 이 if문 윗블럭에서의 시간 합이 아래 시간 합의 10배가 넘기 때문...
+                // if(SrcEvidence[0] > SrcEvidence[2] || SrcEvidence[1] > SrcEvidence[2])
+                //     continue;
                 
                 if(p.dyn == CASE1){
                     
                     EvidType MovingEvidence[3] = {0, (EvidType)(params_.f_moving_confidence * gaussian_weight * MAX_EVIDENCE),
                                                   (EvidType)((1. - params_.f_moving_confidence * gaussian_weight) * MAX_EVIDENCE)};
-
                     
                     DempsterCombination(SrcEvidence, MovingEvidence);
 
@@ -422,7 +443,7 @@ bool RangePmc::Case1Enter(const point_soph & p, const RangeImage &image_info, dy
         p_dyn = CASE1;
         return true;
     }
-    else if (p.vec(2) < min_range + params_.f_range_threshold){ // if point is Static
+    else if (p.vec(2) < max_range + params_.f_range_threshold){ // if point is Static
         p_dyn = STATIC;
         return true;
     }
@@ -470,6 +491,8 @@ void RangePmc::GenerateRangeImage(std::vector<point_soph*> &points, double cur_t
 
         if(range_image_ptr->range_image[points[k]->position].size() < max_pixel_points) // 해당 픽셀에 여유가 있다면 
         {   
+            if(range_image_ptr->range_image[points[k]->position].size() == 0) i_valid_position_num++;
+
             range_image_ptr->range_image[points[k]->position].push_back(points[k]); // 주소를 뒤에 추가함 
 
             // 이 포인트의 range가 픽셀 내 모든 포인트보다 크다면 
@@ -822,12 +845,24 @@ bool RangePmc::KeyFrameCheck(double cur_time, M3D rot, V3D transl)
     return false;
 }
 
-inline float RangePmc::GaussianWeight(V3D p1, V3D p2)
+inline float RangePmc::GaussianWeight(double value, double sigma)
 {   
-    // float weight = -(p1-p2).norm() / 10.0 + 1.0;
-    // if (weight <= 0.0) weight = 0.0;
-    // return weight;
-    return (float)exp(-0.5 * pow((p1-p2).norm()/params_.f_gaussian_sigma, 2));
+    // return - value / (sigma * 2.5) + 1.0;
+
+    // return (float)exp(-0.5 * pow((p1-p2).norm()/params_.f_gaussian_sigma, 2));
+    return (float)(exp(-0.5 * pow(value/sigma, 2)) + 0.1) / 1.1;
+}
+
+int RangePmc::FindIndexInVector(const std::vector<int>& vec, int value) {
+    auto it = std::find(vec.begin(), vec.end(), value);
+    
+    // 값이 벡터 내에 존재한다면, 인덱스 반환
+    if (it != vec.end()) {
+        // 'it - vec.begin()'를 통해 인덱스 계산
+        return std::distance(vec.begin(), it);
+    }
+    // 값이 벡터 내에 존재하지 않는다면, -1 반환
+    return -1;
 }
 
 // 해당 Range Image Vertical FOV 안에 있는 포인트 인지 확인
@@ -875,7 +910,7 @@ bool RangePmc::CheckNeighbor(const point_soph & p, const RangeImage &image_info,
     //     i_total_incident++;
     // }
     if(image_info.incident_all[p.position] < 30 * M_PI/180.0){
-        n = 1;
+        n = 2;
         i_small_incident++;
     }
     else{
@@ -961,6 +996,7 @@ void RangePmc::OutputPmcPC(const std::vector<point_soph*> &points, const RangeIm
 
     //     pmc_xyzrgb_pcptr_->push_back(po);
     // }
+
 
 
     for(int ver_idx = pixel_fov_down; ver_idx < pixel_fov_up; ver_idx++) {
@@ -1057,6 +1093,7 @@ void RangePmc::OutputPmcPC(const std::vector<point_soph*> &points, const RangeIm
                     // }
 
                     pmc_xyzrgb_pcptr_->push_back(po);
+                    
                 }
                 else{
                     for(int pixel_idx = 0 ; pixel_idx < range_image_ptr->range_image[iter_pos].size() ; pixel_idx++){
@@ -1091,6 +1128,8 @@ void RangePmc::OutputPmcPC(const std::vector<point_soph*> &points, const RangeIm
 
         }
     }
+
+    std::cout<<"output pc num: "<<pmc_xyzrgb_pcptr_->points.size()<<std::endl;
 
     // Key frame pcptr
     if(is_key_frame == true){

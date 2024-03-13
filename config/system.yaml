@@ -3,9 +3,9 @@ topic_name:
   
 # Common variables
 common_variable:
-  dataset: kitti # novatel kitti
-  lidar_topic_name: /velodyne_points # /ouster/points /velodyne_points
-  lidar_type: kitti # ouster velodyne kitti
+  dataset: novatel # novatel kitti
+  lidar_topic_name: /ouster/points # /ouster/points /velodyne_points
+  lidar_type: ouster # ouster velodyne kitti
   projection_mode: Cartesian
   use_init_lat_lon: true # if true, do not need ref below
   ref_latitude: 37.589 # howon 37.589 # pangyo 37.399
@@ -15,7 +15,7 @@ common_variable:
   ego_to_lidar_transform:
     x: 1.2
     y: 0.0
-    z: 1.6
+    z: 1.8
   ego_to_lidar_rotation:
     roll: 0.0
     pitch: 0.0
@@ -23,29 +23,29 @@ common_variable:
 
 range_pmc:
   deskewing: true
-  # horizontal_resolution: 0.703125   # deg OS1-512
-  # vertical_resolution: 0.354330     # deg OS1-512
+  horizontal_resolution: 0.703125   # deg OS1-512
+  vertical_resolution: 0.354330     # deg OS1-512
   # horizontal_resolution: 0.4        # deg VLP32
   # vertical_resolution: 0.5          # deg VLP32
-  horizontal_resolution: 0.1728     # deg KITTI
-  vertical_resolution: 0.4          # deg KITTI
+  # horizontal_resolution: 0.1728     # deg KITTI
+  # vertical_resolution: 0.4          # deg KITTI
 
   min_range: 0.5
   max_range: 50
-  range_threshold: 0.5
+  range_threshold: 0.3
   max_range_image_num: 10
   min_occluded_num: 7
   neighbor_pixel_max: 4
 
-  min_key_frame_time: 0.0
+  min_key_frame_time: 0.3
   min_key_frame_rot: 3.0
   
-  # fov_up: 22.5      # OS-1 512
-  # fov_down: -22.5   # OS-1 512
+  fov_up: 22.5      # OS-1 512
+  fov_down: -22.5   # OS-1 512
   # fov_up: 15        # VLP32
   # fov_down: -25     # VLP32
-  fov_up: 2.0       # KITTI
-  fov_down: -24.9   # KITTI
+  # fov_up: 2.0       # KITTI
+  # fov_down: -24.9   # KITTI
 
   fov_left: 180.0
   fov_right: -180.0
@@ -59,8 +59,10 @@ range_pmc:
   segment_valid_line_num: 3
 
   moving_confidence: 0.5
-  static_confidence: 0.3
-  gaussian_sigma: 12
+  static_confidence: 0.5
+  gaussian_sigma: 1 # 클수록 넓게 전파 1 -> 2.1m  4 -> 8.7m 8 -> 17m
+  static_gaussian_sigma: 1
+  dynamic_gaussian_sigma: 3
 
   cluster_level_filtering: true
 

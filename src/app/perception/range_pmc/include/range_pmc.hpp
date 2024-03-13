@@ -51,16 +51,16 @@ using namespace std;
 // #define MAX_POINT      (648000)
 
 // // Ouster 128-512
-// #define MAX_2D_N       (260096)     // MAX_1D * MAX_1D_HALF
-// #define MAX_1D         (512)       // maximum horizontal point of Range Image.     2pi / horizontal_resolution
-// #define MAX_1D_HALF    (508)        // maximum vertical channel num of Range Image. pi / vertical_resolution
-// #define MAX_POINT      (260096)
+#define MAX_2D_N       (260096)     // MAX_1D * MAX_1D_HALF
+#define MAX_1D         (512)       // maximum horizontal point of Range Image.     2pi / horizontal_resolution
+#define MAX_1D_HALF    (508)        // maximum vertical channel num of Range Image. pi / vertical_resolution
+#define MAX_POINT      (260096)
 
 // KITTI
-#define MAX_2D_N       (937350)     // MAX_1D * MAX_1D_HALF
-#define MAX_1D         (2083)       // maximum horizontal point of Range Image.     2pi / horizontal_resolution
-#define MAX_1D_HALF    (450)        // maximum vertical channel num of Range Image. pi / vertical_resolution
-#define MAX_POINT      (937350)
+// #define MAX_2D_N       (937350)     // MAX_1D * MAX_1D_HALF
+// #define MAX_1D         (2083)       // maximum horizontal point of Range Image.     2pi / horizontal_resolution
+// #define MAX_1D_HALF    (450)        // maximum vertical channel num of Range Image. pi / vertical_resolution
+// #define MAX_POINT      (937350)
 
 typedef unsigned char EvidType;
 typedef unsigned short EvidSqaureType;
@@ -92,6 +92,8 @@ struct range_pmc_params{
     float f_moving_confidence;
     float f_static_confidence;
     float f_gaussian_sigma;
+    float f_static_gaussian_sigma;
+    float f_dynamic_gaussian_sigma;
 
     bool b_cluster_level_filtering;
 
@@ -487,7 +489,8 @@ class RangePmc{
     // Utils
     void SphericalProjection(point_soph &p, int range_index, const M3D &rot, const V3D &transl, point_soph &p_spherical);
     bool KeyFrameCheck(double cur_time, M3D rot, V3D transl);
-    inline float GaussianWeight(V3D p1, V3D p2);
+    inline float GaussianWeight(double value, double sigma);
+    int FindIndexInVector(const std::vector<int>& vec, int value);
 
     bool CheckVerFoV(const point_soph & p, const RangeImage &image_info);
     bool CheckNeighbor(const point_soph & p, const RangeImage &image_info, float &max_range, float &min_range);
@@ -538,6 +541,8 @@ class RangePmc{
     int i_total_incident = 0;
     int i_prop_num = 0;
     int i_gaussian = 0;
+    int i_dempster = 0;
+    int i_valid_position_num = 0;
 
     private:
     // Object segmentation

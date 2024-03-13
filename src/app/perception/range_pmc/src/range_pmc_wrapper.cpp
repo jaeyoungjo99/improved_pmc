@@ -47,6 +47,8 @@ void RangePmcWrapper::Init(){
     if (!nh.getParam("/range_pmc/moving_confidence", cfg_f_moving_confidence_)) cfg_f_moving_confidence_ = 0.5;
     if (!nh.getParam("/range_pmc/static_confidence", cfg_f_static_confidence_)) cfg_f_static_confidence_ = 0.5;
     if (!nh.getParam("/range_pmc/gaussian_sigma", cfg_f_gaussian_sigma_)) cfg_f_gaussian_sigma_ = 4;
+    if (!nh.getParam("/range_pmc/static_gaussian_sigma", cfg_f_static_gaussian_sigma_)) cfg_f_static_gaussian_sigma_ = 4;
+    if (!nh.getParam("/range_pmc/dynamic_gaussian_sigma", cfg_f_dynamic_gaussian_sigma_)) cfg_f_dynamic_gaussian_sigma_ = 4;
 
     if (!nh.getParam("/range_pmc/output_static_point", cfg_b_output_static_point_)) cfg_b_output_static_point_ = false;
     if (!nh.getParam("/range_pmc/output_min_range", cfg_b_output_min_range_)) cfg_b_output_min_range_ = false;
@@ -81,6 +83,8 @@ void RangePmcWrapper::Init(){
     params.f_moving_confidence = cfg_f_moving_confidence_;
     params.f_static_confidence = cfg_f_static_confidence_;
     params.f_gaussian_sigma = cfg_f_gaussian_sigma_;
+    params.f_static_gaussian_sigma = cfg_f_static_gaussian_sigma_;
+    params.f_dynamic_gaussian_sigma = cfg_f_dynamic_gaussian_sigma_;
 
     params.b_cluster_level_filtering = cfg_b_cluster_level_filtering_;
     params.b_output_static_point = cfg_b_output_static_point_;
