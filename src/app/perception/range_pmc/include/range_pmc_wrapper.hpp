@@ -405,46 +405,48 @@ class RangePmcWrapper{
     // configure;
     private:
 
-        string cfg_str_dataset_;
-        string cfg_str_lidar_topic_name_;
-        string cfg_str_odom_topic_name_;
-        string cfg_str_lidar_type_;
+        string  cfg_str_dataset_;
+        string  cfg_str_lidar_topic_name_;
+        string  cfg_str_odom_topic_name_;
+        string  cfg_str_lidar_type_;
         
-        bool  cfg_b_deskewing_;
-        float cfg_f_horizontal_resolution_;
-        float cfg_f_vertical_resolution_;
-        float cfg_f_min_range_;
-        float cfg_f_max_range_;
-        float cfg_f_range_threshold_;
-        int cfg_i_max_range_image_num_;
-        float cfg_f_min_key_frame_time_;
-        float cfg_f_min_key_frame_rot_;
-        int cfg_i_frame_rate_;
-        float cfg_f_fov_up_;
-        float cfg_f_fov_down_;
-        float cfg_f_fov_left_;
-        float cfg_f_fov_right_;
-        float cfg_i_min_occluded_num_;
-        int   cfg_i_neighbor_pixel_max_;
-        bool  cfg_b_height_filter_;
+        bool    cfg_b_deskewing_;
+        float   cfg_f_horizontal_resolution_;
+        float   cfg_f_vertical_resolution_;
+        float   cfg_f_min_range_;
+        float   cfg_f_max_range_;
+        int     cfg_i_max_points_in_pixel_;
+        float   cfg_f_range_threshold_;
+        int     cfg_i_max_range_image_num_;
+        float   cfg_f_min_key_frame_time_;
+        float   cfg_f_min_key_frame_rot_;
+        int     cfg_i_frame_rate_;
+        float   cfg_f_fov_up_;
+        float   cfg_f_fov_down_;
+        float   cfg_f_fov_left_;
+        float   cfg_f_fov_right_;
+        float   cfg_i_min_occluded_num_;
+        int     cfg_i_neighbor_pixel_max_;
+        bool    cfg_b_height_filter_;
 
-        float cfg_f_ground_angle_;
-        float cfg_f_dist_threshold_m_;
-        int   cfg_i_segment_min_point_num_;
-        int   cfg_i_segment_valid_poiint_num_;
-        int   cfg_i_segment_valid_line_num_;
+        float   cfg_f_ground_angle_;
+        float   cfg_f_dist_threshold_m_;
+        int     cfg_i_segment_min_point_num_;
+        int     cfg_i_segment_valid_poiint_num_;
+        int     cfg_i_segment_valid_line_num_;
 
-        float cfg_f_moving_confidence_;
-        float cfg_f_static_confidence_;
-        float cfg_f_gaussian_sigma_;
-        float cfg_f_static_gaussian_sigma_;
-        float cfg_f_dynamic_gaussian_sigma_;
+        float   cfg_f_moving_confidence_;
+        float   cfg_f_static_confidence_;
+        float   cfg_f_gaussian_sigma_;
+        float   cfg_f_static_gaussian_sigma_;
+        float   cfg_f_dynamic_gaussian_sigma_;
+        float   cfg_f_sigma_epsilon_;
             
-        bool cfg_b_cluster_level_filtering_;
+        bool    cfg_b_cluster_level_filtering_;
 
-        bool cfg_b_output_static_point_;
-        bool cfg_b_output_min_range_;
-        bool cfg_b_debug_image_;
+        bool    cfg_b_output_static_point_;
+        bool    cfg_b_output_min_range_;
+        bool    cfg_b_debug_image_;
 
         std::vector<float> cfg_vec_f_ego_to_lidar_;
 

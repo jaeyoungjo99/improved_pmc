@@ -51,55 +51,57 @@ using namespace std;
 // #define MAX_POINT      (648000)
 
 // // Ouster 128-512
-#define MAX_2D_N       (260096)     // MAX_1D * MAX_1D_HALF
-#define MAX_1D         (512)       // maximum horizontal point of Range Image.     2pi / horizontal_resolution
-#define MAX_1D_HALF    (508)        // maximum vertical channel num of Range Image. pi / vertical_resolution
-#define MAX_POINT      (260096)
+// #define MAX_2D_N       (260096)     // MAX_1D * MAX_1D_HALF
+// #define MAX_1D         (512)       // maximum horizontal point of Range Image.     2pi / horizontal_resolution
+// #define MAX_1D_HALF    (508)        // maximum vertical channel num of Range Image. pi / vertical_resolution
+// #define MAX_POINT      (260096)
 
 // KITTI
-// #define MAX_2D_N       (937350)     // MAX_1D * MAX_1D_HALF
-// #define MAX_1D         (2083)       // maximum horizontal point of Range Image.     2pi / horizontal_resolution
-// #define MAX_1D_HALF    (450)        // maximum vertical channel num of Range Image. pi / vertical_resolution
-// #define MAX_POINT      (937350)
+#define MAX_2D_N       (937350)     // MAX_1D * MAX_1D_HALF
+#define MAX_1D         (2083)       // maximum horizontal point of Range Image.     2pi / horizontal_resolution
+#define MAX_1D_HALF    (450)        // maximum vertical channel num of Range Image. pi / vertical_resolution
+#define MAX_POINT      (937350)
 
 typedef unsigned char EvidType;
 typedef unsigned short EvidSqaureType;
 static const EvidType MAX_EVIDENCE = 255;
 
 struct range_pmc_params{
-    float f_horizontal_resolution;
-    float f_vertical_resolution;
-    float f_min_range;
-    float f_max_range;
-    float f_range_threshold;
-    int i_max_range_image_num;
-    float f_min_key_frame_time;
-    float f_min_key_frame_rot;
-    float f_fov_up;
-    float f_fov_down;
-    float f_fov_left;
-    float f_fov_right;
-    int i_min_occluded_num;
-    int i_neighbor_pixel_max;
+    float   f_horizontal_resolution;
+    float   f_vertical_resolution;
+    float   f_min_range;
+    float   f_max_range;
+    int     i_max_points_in_pixel;
+    float   f_range_threshold;
+    int     i_max_range_image_num;
+    float   f_min_key_frame_time;
+    float   f_min_key_frame_rot;
+    float   f_fov_up;
+    float   f_fov_down;
+    float   f_fov_left;
+    float   f_fov_right;
+    int     i_min_occluded_num;
+    int     i_neighbor_pixel_max;
 
-    float f_ground_angle;
+    float   f_ground_angle;
 
-    float f_dist_threshold_m;
-    int i_segment_min_point_num;
-    int i_segment_valid_point_num;
-    int i_segment_valid_line_num;
+    float   f_dist_threshold_m;
+    int     i_segment_min_point_num;
+    int     i_segment_valid_point_num;
+    int     i_segment_valid_line_num;
 
-    float f_moving_confidence;
-    float f_static_confidence;
-    float f_gaussian_sigma;
-    float f_static_gaussian_sigma;
-    float f_dynamic_gaussian_sigma;
+    float   f_moving_confidence;
+    float   f_static_confidence;
+    float   f_gaussian_sigma;
+    float   f_static_gaussian_sigma;
+    float   f_dynamic_gaussian_sigma;
+    float   f_sigma_epsilon;
 
-    bool b_cluster_level_filtering;
+    bool    b_cluster_level_filtering;
 
-    bool b_output_static_point;
-    bool b_output_min_range;
-    bool b_debug_image;
+    bool    b_output_static_point;
+    bool    b_output_min_range;
+    bool    b_debug_image;
 
     std::vector<float> vec_f_ego_to_lidar;
 };
@@ -513,30 +515,27 @@ class RangePmc{
 
 
     public:
-    std::deque<RangeImage::Ptr> range_image_list; // back이 최신, front가 old
-    std::vector<point_soph*> point_soph_pointers; // range image 내 point_soph의 벡터. 메모리 관리를 위해 고정적 크기로 관리 
+    std::deque<RangeImage::Ptr> m_range_image_ptr_list; // back이 최신, front가 old
+    std::vector<point_soph*> m_point_soph_pointers; // range image 내 point_soph의 벡터. 메모리 관리를 위해 고정적 크기로 관리 
 
-    point_soph* temp_point_soph_pointer;
-    int cur_point_soph_pointers = 0; // Range Image의 인덱스 
-    int max_pointers_num = 0; // Range Image 개수와 같음 일단 
-
-    RangeImage::Ptr temp_image_pointer;
+    point_soph* m_temp_point_soph_pointer;
+    int m_i_cur_point_soph_pointers = 0; // Range Image의 인덱스 
 
     public:
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr pmc_xyzrgb_pcptr_;
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr range_image_xyzrgb_pcptr_;
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cluster_xyzrgb_pcptr_;
-    std::deque<pcl::PointCloud<pcl::PointXYZRGB>::Ptr> range_image_xyzrgb_pcptr_deque_;
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr m_pmc_xyzrgb_pcptr;
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr m_range_image_xyzrgb_pcptr;
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr m_cluster_xyzrgb_pcptr;
+    std::deque<pcl::PointCloud<pcl::PointXYZRGB>::Ptr> m_deque_range_image_xyzrgb_pcptr;
 
-    double time_total = 0.0, time_cluster_labeling = 0.0, time_demster = 0.0, time_gaussian = 0.0;
-    int    pixel_fov_up, pixel_fov_down, pixel_fov_left, pixel_fov_right;
+    
+    int    m_i_pixel_fov_up, m_i_pixel_fov_down, m_i_pixel_fov_left, m_i_pixel_fov_right;
     int    m_i_row_size, m_i_col_size;
-    int    occu_time_th = 3, is_occu_time_th = 3, map_index = 0;
+    int    m_i_map_index = 0;
 
-    int max_pixel_points = 100; // 픽셀당 최대 포인트 수 
-
-    bool is_key_frame;
-
+    bool m_b_key_frame;
+    
+    // Calcuation time
+    double time_total = 0.0, time_cluster_labeling = 0.0, time_demster = 0.0, time_gaussian = 0.0;
     int i_small_incident = 0;
     int i_total_incident = 0;
     int i_prop_num = 0;
@@ -552,11 +551,11 @@ class RangePmc{
     std::vector<uint16_t> m_v_ui16_queue_idx_x; // array for breadth-first search process of segmentation, for speed
     std::vector<uint16_t> m_v_ui16_queue_idx_y;
 
-    int i_cluster_idx = 0;
+    int m_i_cluster_idx = 0;
 
     // configure;
     private:
-    range_pmc_params params_;
+    range_pmc_params m_params;
 
 
 

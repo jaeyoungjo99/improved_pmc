@@ -26,6 +26,7 @@ void RangePmcWrapper::Init(){
     if (!nh.getParam("/range_pmc/vertical_resolution", cfg_f_vertical_resolution_)) cfg_f_vertical_resolution_ = 1.0;
     if (!nh.getParam("/range_pmc/min_range", cfg_f_min_range_)) cfg_f_min_range_ = 1.0;
     if (!nh.getParam("/range_pmc/max_range", cfg_f_max_range_))  cfg_f_max_range_ = 100.0;
+    if (!nh.getParam("/range_pmc/max_points_in_pixel", cfg_i_max_points_in_pixel_))  cfg_i_max_points_in_pixel_ = 100;
     if (!nh.getParam("/range_pmc/range_threshold", cfg_f_range_threshold_))  cfg_f_range_threshold_ = 0.1;
     if (!nh.getParam("/range_pmc/max_range_image_num", cfg_i_max_range_image_num_)) cfg_i_max_range_image_num_ = 10;
     if (!nh.getParam("/range_pmc/min_occluded_num", cfg_i_min_occluded_num_)) cfg_i_min_occluded_num_ = 5;
@@ -49,6 +50,7 @@ void RangePmcWrapper::Init(){
     if (!nh.getParam("/range_pmc/gaussian_sigma", cfg_f_gaussian_sigma_)) cfg_f_gaussian_sigma_ = 4;
     if (!nh.getParam("/range_pmc/static_gaussian_sigma", cfg_f_static_gaussian_sigma_)) cfg_f_static_gaussian_sigma_ = 4;
     if (!nh.getParam("/range_pmc/dynamic_gaussian_sigma", cfg_f_dynamic_gaussian_sigma_)) cfg_f_dynamic_gaussian_sigma_ = 4;
+    if (!nh.getParam("/range_pmc/sigma_epsilon", cfg_f_sigma_epsilon_)) cfg_f_sigma_epsilon_ = 0.1;
 
     if (!nh.getParam("/range_pmc/output_static_point", cfg_b_output_static_point_)) cfg_b_output_static_point_ = false;
     if (!nh.getParam("/range_pmc/output_min_range", cfg_b_output_min_range_)) cfg_b_output_min_range_ = false;
@@ -61,6 +63,7 @@ void RangePmcWrapper::Init(){
     params.f_vertical_resolution = cfg_f_vertical_resolution_ * M_PI/180.0;
     params.f_min_range = cfg_f_min_range_;
     params.f_max_range = cfg_f_max_range_;
+    params.i_max_points_in_pixel = cfg_i_max_points_in_pixel_;
     params.f_range_threshold = cfg_f_range_threshold_;
     params.i_max_range_image_num = cfg_i_max_range_image_num_;
     params.f_min_key_frame_time = cfg_f_min_key_frame_time_;
@@ -85,6 +88,7 @@ void RangePmcWrapper::Init(){
     params.f_gaussian_sigma = cfg_f_gaussian_sigma_;
     params.f_static_gaussian_sigma = cfg_f_static_gaussian_sigma_;
     params.f_dynamic_gaussian_sigma = cfg_f_dynamic_gaussian_sigma_;
+    params.f_sigma_epsilon = cfg_f_sigma_epsilon_;
 
     params.b_cluster_level_filtering = cfg_b_cluster_level_filtering_;
     params.b_output_static_point = cfg_b_output_static_point_;
