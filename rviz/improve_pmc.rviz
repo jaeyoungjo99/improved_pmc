@@ -4,14 +4,18 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
+        - /Global Options1
         - /Status1
         - /Utils1
-        - /Utils1/World Grid1
+        - /Utils1/LiDAR Axis1
         - /Sensor Raw1
+        - /Sensor Raw1/MOE Points1
+        - /Sensor Raw1/Ouster1/Autocompute Value Bounds1
         - /PMC1
-        - /PMC1/PMC PointCloud1
+        - /PMC1/PMC PointCloud Height1/Autocompute Value Bounds1
         - /PMC1/Key Frame Point Cloud1
-      Splitter Ratio: 0.6329966187477112
+        - /PMC1/Key Frame Point Cloud1/Autocompute Value Bounds1
+      Splitter Ratio: 0.6414141654968262
     Tree Height: 901
   - Class: rviz/Selection
     Name: Selection
@@ -73,9 +77,36 @@ Visualization Manager:
             Y: 0
             Z: 0
           Plane: XY
-          Plane Cell Count: 30
+          Plane Cell Count: 100
           Reference Frame: world
           Value: true
+        - Alpha: 0.5
+          Cell Size: 1
+          Class: rviz/Grid
+          Color: 160; 160; 164
+          Enabled: false
+          Line Style:
+            Line Width: 0.029999999329447746
+            Value: Lines
+          Name: Ouster Grid
+          Normal Cell Count: 0
+          Offset:
+            X: 0
+            Y: 0
+            Z: 0
+          Plane: XY
+          Plane Cell Count: 10
+          Reference Frame: os_sensor
+          Value: false
+        - Alpha: 1
+          Class: rviz/Axes
+          Enabled: false
+          Length: 0.30000001192092896
+          Name: LiDAR Axis
+          Radius: 0.029999999329447746
+          Reference Frame: os_sensor
+          Show Trail: false
+          Value: false
         - Class: rviz/TF
           Enabled: true
           Filter (blacklist): ""
@@ -86,6 +117,8 @@ Visualization Manager:
             Scala2:
               Value: true
             ego_frame:
+              Value: true
+            moe:
               Value: true
             os_sensor:
               Value: true
@@ -104,44 +137,19 @@ Visualization Manager:
               ego_frame:
                 Scala2:
                   {}
+                moe:
+                  {}
                 os_sensor:
                   {}
                 velodyne:
                   {}
           Update Interval: 0
           Value: true
-        - Alpha: 1
-          Class: rviz/Axes
-          Enabled: true
-          Length: 0.30000001192092896
-          Name: LiDAR Axis
-          Radius: 0.029999999329447746
-          Reference Frame: os_sensor
-          Show Trail: false
-          Value: true
-        - Alpha: 0.5
-          Cell Size: 1
-          Class: rviz/Grid
-          Color: 160; 160; 164
-          Enabled: true
-          Line Style:
-            Line Width: 0.029999999329447746
-            Value: Lines
-          Name: Ouster Grid
-          Normal Cell Count: 0
-          Offset:
-            X: 0
-            Y: 0
-            Z: 0
-          Plane: XY
-          Plane Cell Count: 10
-          Reference Frame: os_sensor
-          Value: true
         - Alpha: 0.5
           Cell Size: 10
           Class: rviz/Grid
           Color: 67; 164; 40
-          Enabled: false
+          Enabled: true
           Line Style:
             Line Width: 0.029999999329447746
             Value: Lines
@@ -152,13 +160,97 @@ Visualization Manager:
             Y: 0
             Z: 0
           Plane: XY
-          Plane Cell Count: 10
+          Plane Cell Count: 20
           Reference Frame: ego_frame
-          Value: false
+          Value: true
       Enabled: true
       Name: Utils
     - Class: rviz/Group
       Displays:
+        - Alpha: 1
+          Autocompute Intensity Bounds: true
+          Autocompute Value Bounds:
+            Max Value: 15.7107572555542
+            Min Value: -0.5297994613647461
+            Value: true
+          Axis: Z
+          Channel Name: intensity
+          Class: rviz/PointCloud2
+          Color: 255; 255; 255
+          Color Transformer: AxisColor
+          Decay Time: 2
+          Enabled: false
+          Invert Rainbow: false
+          Max Color: 255; 255; 255
+          Min Color: 0; 0; 0
+          Name: MOE Points ACC
+          Position Transformer: XYZ
+          Queue Size: 10
+          Selectable: true
+          Size (Pixels): 3
+          Size (m): 0.009999999776482582
+          Style: Flat Squares
+          Topic: /moe_points
+          Unreliable: false
+          Use Fixed Frame: true
+          Use rainbow: true
+          Value: false
+        - Alpha: 1
+          Autocompute Intensity Bounds: true
+          Autocompute Value Bounds:
+            Max Value: 2.382568120956421
+            Min Value: -0.6507816910743713
+            Value: true
+          Axis: Z
+          Channel Name: intensity
+          Class: rviz/PointCloud2
+          Color: 255; 255; 255
+          Color Transformer: FlatColor
+          Decay Time: 0
+          Enabled: false
+          Invert Rainbow: false
+          Max Color: 255; 255; 255
+          Min Color: 0; 0; 0
+          Name: MOE Points
+          Position Transformer: XYZ
+          Queue Size: 10
+          Selectable: true
+          Size (Pixels): 3
+          Size (m): 0.019999999552965164
+          Style: Points
+          Topic: /moe_points
+          Unreliable: false
+          Use Fixed Frame: true
+          Use rainbow: true
+          Value: false
+        - Alpha: 1
+          Autocompute Intensity Bounds: true
+          Autocompute Value Bounds:
+            Max Value: 10
+            Min Value: -10
+            Value: true
+          Axis: Z
+          Channel Name: intensity
+          Class: rviz/PointCloud2
+          Color: 255; 255; 255
+          Color Transformer: Intensity
+          Decay Time: 0
+          Enabled: false
+          Invert Rainbow: false
+          Max Color: 255; 255; 255
+          Min Color: 0; 0; 0
+          Name: Scala Raw
+          Position Transformer: XYZ
+          Queue Size: 10
+          Selectable: true
+          Size (Pixels): 3
+          Size (m): 0.009999999776482582
+          Style: Points
+          Topic: /scala_gen2_points
+          Unreliable: false
+          Use Fixed Frame: true
+          Use rainbow: true
+          Value: false
         - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
@@ -171,7 +263,7 @@ Visualization Manager:
           Color: 255; 255; 255
           Color Transformer: FlatColor
           Decay Time: 0
-          Enabled: true
+          Enabled: false
           Invert Rainbow: false
           Max Color: 255; 255; 255
           Min Color: 0; 0; 0
@@ -186,7 +278,7 @@ Visualization Manager:
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
-          Value: true
+          Value: false
         - Alpha: 0.6000000238418579
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
@@ -218,16 +310,16 @@ Visualization Manager:
         - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 10
-            Min Value: -10
-            Value: true
+            Max Value: 15
+            Min Value: -2
+            Value: false
           Axis: Z
           Channel Name: t
           Class: rviz/PointCloud2
           Color: 255; 255; 255
-          Color Transformer: FlatColor
+          Color Transformer: AxisColor
           Decay Time: 0
-          Enabled: true
+          Enabled: false
           Invert Rainbow: false
           Max Color: 255; 255; 255
           Min Color: 0; 0; 0
@@ -242,7 +334,7 @@ Visualization Manager:
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
-          Value: true
+          Value: false
         - Alpha: 0.6000000238418579
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
@@ -271,7 +363,7 @@ Visualization Manager:
           Use Fixed Frame: true
           Use rainbow: true
           Value: false
-      Enabled: false
+      Enabled: true
       Name: Sensor Raw
     - Class: rviz/Group
       Displays:
@@ -395,19 +487,47 @@ Visualization Manager:
           Position Transformer: XYZ
           Queue Size: 10
           Selectable: true
-          Size (Pixels): 4
-          Size (m): 0.10000000149011612
-          Style: Spheres
+          Size (Pixels): 3
+          Size (m): 0.05000000074505806
+          Style: Points
           Topic: /app/perc/pmc_point_cloud
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
           Value: true
+        - Alpha: 1
+          Autocompute Intensity Bounds: true
+          Autocompute Value Bounds:
+            Max Value: 15
+            Min Value: -2
+            Value: false
+          Axis: Z
+          Channel Name: intensity
+          Class: rviz/PointCloud2
+          Color: 255; 255; 255
+          Color Transformer: AxisColor
+          Decay Time: 0
+          Enabled: false
+          Invert Rainbow: false
+          Max Color: 255; 255; 255
+          Min Color: 0; 0; 0
+          Name: PMC PointCloud Height
+          Position Transformer: XYZ
+          Queue Size: 10
+          Selectable: true
+          Size (Pixels): 3
+          Size (m): 0.05000000074505806
+          Style: Points
+          Topic: /app/perc/pmc_point_cloud
+          Unreliable: false
+          Use Fixed Frame: true
+          Use rainbow: true
+          Value: false
         - Alpha: 0.4000000059604645
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 6.82982063293457
-            Min Value: -0.565436840057373
+            Max Value: 4.603063583374023
+            Min Value: -6.448554039001465
             Value: true
           Axis: Z
           Channel Name: intensity
@@ -434,16 +554,16 @@ Visualization Manager:
         - Alpha: 0.30000001192092896
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 50
-            Min Value: 37
+            Max Value: 1
+            Min Value: -0.5
             Value: false
           Axis: Z
           Channel Name: intensity
           Class: rviz/PointCloud2
           Color: 255; 255; 255
-          Color Transformer: RGB8
+          Color Transformer: FlatColor
           Decay Time: 0
-          Enabled: true
+          Enabled: false
           Invert Rainbow: false
           Max Color: 255; 255; 255
           Min Color: 0; 0; 0
@@ -451,14 +571,14 @@ Visualization Manager:
           Position Transformer: XYZ
           Queue Size: 10
           Selectable: true
-          Size (Pixels): 1
-          Size (m): 0.019999999552965164
-          Style: Spheres
+          Size (Pixels): 2
+          Size (m): 0.029999999329447746
+          Style: Points
           Topic: /app/perc/key_frame_point_cloud
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
-          Value: true
+          Value: false
         - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
@@ -488,7 +608,7 @@ Visualization Manager:
           Use rainbow: true
           Value: false
         - Class: rviz/Image
-          Enabled: false
+          Enabled: true
           Image Topic: /kitti/camera_color_left/image_raw
           Max Value: 1
           Median window: 5
@@ -498,7 +618,7 @@ Visualization Manager:
           Queue Size: 2
           Transport Hint: raw
           Unreliable: false
-          Value: false
+          Value: true
         - Class: rviz/Image
           Enabled: false
           Image Topic: /app/perc/range_image
@@ -548,7 +668,7 @@ Visualization Manager:
           Unreliable: false
           Value: true
         - Class: rviz/Image
-          Enabled: true
+          Enabled: false
           Image Topic: /app/perc/cluster_image
           Max Value: 1
           Median window: 5
@@ -558,14 +678,14 @@ Visualization Manager:
           Queue Size: 2
           Transport Hint: raw
           Unreliable: false
-          Value: true
+          Value: false
       Enabled: true
       Name: PMC
   Enabled: true
   Global Options:
     Background Color: 0; 0; 0
     Default Light: true
-    Fixed Frame: world
+    Fixed Frame: ego_frame
     Frame Rate: 30
   Name: root
   Tools:
@@ -589,7 +709,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 4.946996688842773
+      Distance: 7.352573394775391
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -597,17 +717,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: -14.02281379699707
-        Y: 14.003003120422363
-        Z: -2.7610713004833087e-06
+        X: -24.617721557617188
+        Y: -1.0761663913726807
+        Z: -3.19846026286541e-06
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.8147966265678406
-      Target Frame: velodyne
-      Yaw: 5.949040412902832
+      Pitch: 0.19479602575302124
+      Target Frame: ego_frame
+      Yaw: 5.814573287963867
     Saved: ~
 Window Geometry:
   Cluster Image:
@@ -627,7 +747,7 @@ Window Geometry:
     collapsed: false
   PMC Range Image:
     collapsed: false
-  QMainWindow State: 000000ff00000000fd0000000400000000000002540000040efc0200000008fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c00610079007301000002110000040e000000c700fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c0000026100000001000001830000040efc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a0056006900650077007301000002110000040e000000a000fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000e77000001d0fc0100000003fc0000000000000d9c000000b000fffffffa000000000200000002fb000000220050004d0043002000440079006e0061006d0069006300200049006d0061006700650100000000ffffffff0000001600fffffffb0000001e0050004d0043002000520061006e0067006500200049006d006100670065010000003b000001d00000001600fffffffc00000da2000000d50000008800fffffffa000000010200000002fb00000016004b004900540054004900200049006d0061006700650100000000ffffffff0000001600fffffffb0000001a0043006c0075007300740065007200200049006d006100670065010000003b000001d00000001600fffffffb0000000a00560069006500770073030000004e00000080000002e1000001970000000300000e77000001d1fc0100000003fc00000000000007380000008a00fffffffa000000000200000003fb0000001800470072006f0075006e006400200049006d0061006700650100000000ffffffff0000001600fffffffb0000001600520061006e0067006500200049006d0061006700650000000000ffffffff0000001600fffffffb0000000800540069006d006500000007b80000003e0000003700fffffffb0000001c0049006e0063006900640065006e007400200049006d006100670065010000073e000007390000008e00fffffffb0000000800540069006d0065010000000000000450000000000000000000000a940000040e00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd0000000400000000000002540000040efc0200000008fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c00610079007301000002110000040e000000c700fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c0000026100000001000001830000040efc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a0056006900650077007301000002110000040e000000a000fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000acd000001d0fc0100000003fb000000220050004d0043002000440079006e0061006d0069006300200049006d006100670065010000000000000a49000000b000fffffffb00000016004b004900540054004900200049006d0061006700650100000a4f0000007e0000007b00fffffffb0000000a00560069006500770073030000004e00000080000002e1000001970000000300000acd000001d1fc0100000003fc00000000000001ca0000008a00fffffffa000000020200000005fb0000001a0043006c0075007300740065007200200049006d0061006700650000000000ffffffff0000001600fffffffb0000001e0050004d0043002000520061006e0067006500200049006d0061006700650000000000ffffffff0000001600fffffffb0000001800470072006f0075006e006400200049006d0061006700650100000000ffffffff0000001600fffffffb0000001600520061006e0067006500200049006d0061006700650000000000ffffffff0000001600fffffffb0000000800540069006d006500000007b80000003e0000003700fffffffb0000001c0049006e0063006900640065006e007400200049006d00610067006501000001d0000008fd0000008e00fffffffb0000000800540069006d00650100000000000004500000000000000000000006ea0000040e00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Range Image:
     collapsed: false
   Selection:
@@ -638,6 +758,6 @@ Window Geometry:
     collapsed: false
   Views:
     collapsed: false
-  Width: 3703
-  X: 1952
-  Y: -39
+  Width: 2765
+  X: 1943
+  Y: -28

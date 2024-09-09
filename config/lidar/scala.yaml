@@ -1,0 +1,24 @@
+scala:
+  horizontal_resolution: 0.1239   
+  vertical_resolution: 0.633   
+
+  min_range: 0.7
+  max_range: 100
+  max_points_in_pixel: 3
+  
+  # fov_up: 4.75    
+  fov_up: 5.383
+  # fov_down: -4.75  
+  fov_down: -5.383
+
+  fov_left: 65.96 
+  fov_right: -65.96 
+
+  ego_to_lidar_transform:
+    x: 3.6 # scala 
+    y: -0.3 # scala
+    z: 0.5 # scala
+  ego_to_lidar_rotation:
+    roll: 0.0
+    pitch: 2 # kitti -0.5 # scala 3 # ouster -0.5
+    yaw: 0.0 # city-highway 

@@ -33,6 +33,7 @@ void NovatelConverter::Init(){
 
     ROS_INFO_STREAM("projection_mode_ "<<projection_mode_);
     ROS_INFO_STREAM("str_dataset_ "<<str_dataset_);
+    ROS_INFO_STREAM("novatel_heading_bias_deg_ "<<novatel_heading_bias_deg_);
 
     if(b_use_init_lat_lon_ = false){
         ROS_INFO_STREAM("ref_latitude_ "<<ref_latitude_);
@@ -69,7 +70,7 @@ void NovatelConverter::Init(){
 }
 
 void NovatelConverter::Run(){
-    ros::Rate rate(100); // 100 Hz
+    ros::Rate rate(200); // 100 Hz
 
     while (ros::ok()) {
         // Your code to be executed every 10 seconds
@@ -162,7 +163,7 @@ void NovatelConverter::UpdateEgoGeo(const novatel_oem7_msgs::INSPVAX inspvax_msg
 
     ego_geo.pose.pose.position.x = projected_point.x();
     ego_geo.pose.pose.position.y = projected_point.y();
-    ego_geo.pose.pose.position.z = inspvax_msg.height;
+    ego_geo.pose.pose.position.z = inspvax_msg.height - ref_height_;
 
     double roll = inspvax_msg.roll * M_PI / 180.0;
     double pitch = -inspvax_msg.pitch * M_PI / 180.0;
@@ -230,6 +231,7 @@ void NovatelConverter::CallbackINSPVAX(const novatel_oem7_msgs::INSPVAX::ConstPt
     if(b_is_ref_init_ == false){
         ref_latitude_ = i_novatel_inspvax_.latitude;
         ref_longitude_ = i_novatel_inspvax_.longitude;
+        ref_height_ = i_novatel_inspvax_.height;
         b_is_ref_init_ = true;
     }
     b_is_new_msg_ = true;

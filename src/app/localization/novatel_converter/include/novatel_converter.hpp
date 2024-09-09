@@ -67,6 +67,7 @@ class NovatelConverter{
     bool b_use_init_lat_lon_ = false;
     double ref_latitude_ = 0.0;
     double ref_longitude_ = 0.0;
+    double ref_height_ = 0.0;
     double novatel_heading_bias_deg_ = 0.0;
 
     novatel_oem7_msgs::INSPVAX i_novatel_inspvax_;

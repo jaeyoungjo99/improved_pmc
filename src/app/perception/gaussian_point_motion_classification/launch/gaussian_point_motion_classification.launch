@@ -1,0 +1,14 @@
+<!-- -->
+<launch>
+
+  <rosparam file="$(find gaussian_point_motion_classification)/../../../../config/system.yaml" command="load"/>  
+  <rosparam file="$(find gaussian_point_motion_classification)/../../../../config/lidar/ouster.yaml" command="load"/>  
+  <rosparam file="$(find gaussian_point_motion_classification)/../../../../config/lidar/scala.yaml" command="load"/>  
+  <rosparam file="$(find gaussian_point_motion_classification)/../../../../config/lidar/vlp32.yaml" command="load"/>  
+  <rosparam file="$(find gaussian_point_motion_classification)/../../../../config/lidar/kitti.yaml" command="load"/>  
+  <rosparam file="$(find gaussian_point_motion_classification)/../../../../config/lidar/moe.yaml" command="load"/>  
+
+  <node pkg="gaussian_point_motion_classification" type="gaussian_point_motion_classification" name="gaussian_point_motion_classification" output="screen" respawn="false">
+
+  </node>
+</launch>

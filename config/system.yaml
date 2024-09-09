@@ -3,75 +3,68 @@ topic_name:
   
 # Common variables
 common_variable:
-  dataset: kitti # novatel kitti
-  lidar_topic_name: /velodyne_points # /ouster/points /velodyne_points
-  lidar_type: kitti # ouster velodyne kitti
+  dataset: kitti # novatel kitti 
+  lidar_topic_name: /velodyne_points # /ouster/points /velodyne_points /scala_gen2_points /moe_points
+  lidar_type: kitti # ouster vlp32 kitti scala moe
   projection_mode: Cartesian
   use_init_lat_lon: true # if true, do not need ref below
   ref_latitude: 37.589 # howon 37.589 # pangyo 37.399
   ref_longitude: 127.157 # howon 127.157 # pangyo  127.109
-  novatel_heading_bias_deg: -0.5 # pangyo -0.5
-
-  ego_to_lidar_transform:
-    x: 1.2
-    y: 0.0
-    z: 1.8
-  ego_to_lidar_rotation:
-    roll: 0.0
-    pitch: 0.0
-    yaw: 0.0
+  novatel_heading_bias_deg: 0.0 # pangyo -0.5
 
 range_pmc:
   deskewing: true
-  # horizontal_resolution: 0.703125   # deg OS1-512
-  # vertical_resolution: 0.354330     # deg OS1-512
-  # horizontal_resolution: 0.4        # deg VLP32
-  # vertical_resolution: 0.5          # deg VLP32
-  horizontal_resolution: 0.1728     # deg KITTI
-  vertical_resolution: 0.4          # deg KITTI
 
-  min_range: 0.5
-  max_range: 50
-  max_points_in_pixel: 100
-  range_threshold: 0.5
+  # Range comparison
+  vertical_neighbor_pixel: 2
+  horizontal_neighbor_pixel: 2
+
+  # Range image config
+  range_threshold: 0.3
   max_range_image_num: 10
-  min_occluded_num: 7
-  neighbor_pixel_max: 4
-
-  min_key_frame_time: 0.3
-  min_key_frame_rot: 3.0
-  
-  # fov_up: 22.5      # OS-1 512
-  # fov_down: -22.5   # OS-1 512
-  # fov_up: 15        # VLP32
-  # fov_down: -25     # VLP32
-  fov_up: 2.0       # KITTI
-  fov_down: -24.9   # KITTI
-
-  fov_left: 180.0
-  fov_right: -180.0
   height_filter: false
 
-  ground_angle: 5 # deg
+  min_key_frame_time: 0.18
+  min_key_frame_rot: 3.0
 
-  dist_threshold_m: 1.0
-  segment_min_point_num: 50
-  segment_valid_point_num: 8
+  ground_angle: 10 # deg 17.4%
+
+  # Clustering
+  dist_threshold_m: 0.5
+  segment_min_point_num: 30
+  segment_valid_point_num: 5
   segment_valid_line_num: 3
 
-  moving_confidence: 0.5
-  static_confidence: 0.5
-  gaussian_sigma: 1 # 클수록 넓게 전파 1 -> 2.1m  4 -> 8.7m 8 -> 17m
-  static_gaussian_sigma: 3
-  dynamic_gaussian_sigma: 3
-  sigma_epsilon: 0.05
+  moving_confidence: 0.3 # 0.3
+  static_confidence: 0.15 # 0.15
+  gaussian_sigma: 1.0 # 0.4 쎄게, 0.8 약하게
+  static_gaussian_sigma: 1.5 # deprecated
+  dynamic_gaussian_sigma: 2 # 클수록 넓게 전파 1 -> 2.1m  4 -> 8.7m 8 -> 17m
+  sigma_epsilon: 0.05 # 최소 sigma 값.
 
-  cluster_level_filtering: false
+  ground_filtering: true # ground filtering을 true로 해야 cluster level filtering 가능 
+  cluster_level_filtering: true # deprecated
+  
+  run_case_2: true
+  run_small_dynamic_filtering: true
+  min_voxel_cluster_num: 20 # 복셀 클러스터의 최소 복셀 개수
+  
+  run_region_growing: true
 
   output_static_point: false
-  output_min_range: true
+  output_discrete_label: true
+  output_min_range: false
   debug_image: true
+
+  run_evaluation: true
+  evaluation_dataset: kitti # kitti moe
   
+moe_evaluation:
+  pcd_folder_path: /mnt/c/Users/Alien02/Documents/rosbag/moe/04/pcd/
+  label_folder_path: /mnt/c/Users/Alien02/Documents/rosbag/moe/04/label/
+  pose_file_path: /mnt/c/Users/Alien02/Documents/rosbag/moe/04/gt_poses.txt
+
+  result_bag_path: /mnt/c/Users/Alien02/Documents/rosbag/moe/04/result.bag
 
 # Task ID
 task_id:

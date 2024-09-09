@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(range_pmc)
+project(gaussian_point_motion_classification)
 
 ## Compile as C++14, supported in ROS Kinetic and newer
 add_compile_options(-std=c++17)
@@ -28,7 +28,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}   ${OpenMP_C_FLAGS}")
 find_package(PCL REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(Boost REQUIRED COMPONENTS system)
-find_package(TBB REQUIRED)
+# find_package(TBB REQUIRED)
 
 ###################################
 ## catkin specific configuration ##
@@ -48,6 +48,10 @@ catkin_package(
 ###########
 ## Build ##
 ###########
+
+
+option(USE_SYSTEM_TBB "Use system pre-installed oneAPI/tbb" OFF)
+include(3rdparty/find_dependencies.cmake)
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
@@ -72,8 +76,8 @@ include_directories(
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(${PROJECT_NAME} 
-    src/range_pmc.cpp
-    src/range_pmc_wrapper.cpp
+    src/gaussian_point_motion_classification.cpp
+    src/gaussian_point_motion_classification_wrapper.cpp
 )
 
 ## Rename C++ executable without prefix
@@ -94,5 +98,7 @@ target_link_libraries(${PROJECT_NAME}
     ${catkin_LIBRARIES}
     ${PCL_LIBRARIES}
     ${OpenCV_LIBRARIES}
-    ${TBB_LIBRARIES}
+    # ${TBB_LIBRARIES}
+    TBB::tbb
+
 )

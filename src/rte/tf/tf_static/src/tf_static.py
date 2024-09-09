@@ -111,6 +111,7 @@ class TransformFrameStatic(object):
         self.add_tf_from_config(self.ini_file,'Ego To VLP32',update_time)
         self.add_tf_from_config(self.ini_file,'Ego To ouster',update_time)
         self.add_tf_from_config(self.ini_file,'Ego To Scala',update_time)
+        self.add_tf_from_config(self.ini_file,'Ego To MOE',update_time)
         
         while not rospy.is_shutdown():
             self.update_frame()

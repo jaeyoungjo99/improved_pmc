@@ -84,7 +84,10 @@
         "typeindex": "cpp",
         "typeinfo": "cpp",
         "bit": "cpp",
-        "*.ipp": "cpp"
+        "*.ipp": "cpp",
+        "scoped_allocator": "cpp",
+        "valarray": "cpp",
+        "eigen": "cpp"
     },
     "cmake.sourceDirectory": "/home/jaeyoung/git/improve_pmc_ws/src/app/perception/range_pmc"
 }

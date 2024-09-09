@@ -16,7 +16,7 @@ from geometry_msgs.msg import PoseWithCovarianceStamped
 from geometry_msgs.msg import Transform
 from visualization_msgs.msg import Marker
 
-from autoku_msgs.msg import VehicleState
+# from autoku_msgs.msg import VehicleState
 import math
 
 RAD2DEG = 180.0 / math.pi

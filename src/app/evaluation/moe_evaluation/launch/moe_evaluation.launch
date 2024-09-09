@@ -1,0 +1,9 @@
+<!-- -->
+<launch>
+
+  <rosparam file="$(find moe_evaluation)/../../../../config/system.yaml" command="load"/>  
+
+  <node pkg="moe_evaluation" type="moe_evaluation" name="moe_evaluation" output="screen" respawn="false">
+
+  </node>
+</launch>

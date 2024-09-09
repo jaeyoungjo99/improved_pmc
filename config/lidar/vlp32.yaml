@@ -1,0 +1,22 @@
+vlp32:
+  horizontal_resolution: 0.2   
+  vertical_resolution: 0.2   
+
+  min_range: 0.7
+  max_range: 100
+  max_points_in_pixel: 3
+  
+  fov_up: 15.5    
+  fov_down: -25.5  
+
+  fov_left: 180.0 
+  fov_right: -180.0 
+
+  ego_to_lidar_transform:
+    x: 1.2 
+    y: 0.0 
+    z: 1.7 
+  ego_to_lidar_rotation:
+    roll: 0.0
+    pitch: 0.0
+    yaw: 0.0 
